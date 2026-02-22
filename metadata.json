@@ -1,0 +1,7 @@
+{
+  "name": "Benishangul-Gumuz Police ID System",
+  "description": "A comprehensive ID card management system for the Benishangul-Gumuz Region Police Commission, featuring auto-translation, QR verification, and history tracking.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
