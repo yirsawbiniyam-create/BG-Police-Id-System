@@ -51,6 +51,10 @@ const app = express();
 app.use(express.json({ limit: '10mb' }));
 
 // API Routes
+app.get("/api/health", (req, res) => {
+  res.json({ status: "ok", vercel: isVercel });
+});
+
 app.get("/api/ids", (req, res) => {
   const { search } = req.query;
   let query = "SELECT * FROM ids";
@@ -210,7 +214,7 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, "dist");
+    const distPath = path.join(__dirname, "..", "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));

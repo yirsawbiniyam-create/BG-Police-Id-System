@@ -439,6 +439,7 @@ export default function App() {
       }
     } catch (error) {
       console.error("Submission error:", error);
+      alert("ስህተት ተፈጥሯል! እባክዎ እንደገና ይሞክሩ። (Error: " + (error instanceof Error ? error.message : String(error)) + ")");
     } finally {
       setLoading(false);
       setTranslating(false);
