@@ -76,10 +76,10 @@ process.on('unhandledRejection', (reason, promise) => {
 
 const app = express();
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '50mb' }));
 
 // API Routes
 app.get("/api/health", (req, res) => {
@@ -87,6 +87,7 @@ app.get("/api/health", (req, res) => {
 });
 
 app.get("/api/ids", (req, res) => {
+  console.log("GET /api/ids hit");
   const { search } = req.query;
   let query = "SELECT * FROM ids";
   const params = [];
@@ -146,15 +147,26 @@ app.get("/api/scans/:id_number", (req, res) => {
 
 // Assets (Flags/Logo)
 app.get("/api/assets", (req, res) => {
+  console.log("GET /api/assets hit");
   const rows = db.prepare("SELECT * FROM assets").all();
   const assets = rows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
   res.json(assets);
 });
 
 app.post("/api/assets", (req, res) => {
+  console.log("POST /api/assets hit", req.body?.key);
   const { key, value } = req.body;
+  if (!key || !value) {
+    return res.status(400).json({ error: "Missing key or value" });
+  }
   db.prepare("INSERT OR REPLACE INTO assets (key, value) VALUES (?, ?)").run(key, value);
   res.json({ success: true });
+});
+
+// API 404 Handler - prevent falling through to SPA fallback
+app.use("/api/*", (req, res) => {
+  console.log(`API 404: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
 });
 
 // --- Backup & Restore ---
