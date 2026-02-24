@@ -48,142 +48,139 @@ db.exec(`
 `);
 
 const app = express();
+app.use(express.json({ limit: '10mb' }));
 
-async function startServer() {
-  const PORT = 3000;
+// API Routes
+app.get("/api/ids", (req, res) => {
+  const { search } = req.query;
+  let query = "SELECT * FROM ids";
+  const params = [];
+  if (search) {
+    query += " WHERE full_name_am LIKE ? OR full_name_en LIKE ? OR phone LIKE ? OR id_number LIKE ?";
+    const s = `%${search}%`;
+    params.push(s, s, s, s);
+  }
+  query += " ORDER BY full_name_am ASC";
+  const rows = db.prepare(query).all(...params);
+  res.json(rows);
+});
 
-  app.use(express.json({ limit: '10mb' }));
+app.post("/api/ids", (req, res) => {
+  const { 
+    full_name_am, full_name_en, 
+    rank_am, rank_en, 
+    responsibility_am, responsibility_en, 
+    phone, photo_url, commissioner_signature
+  } = req.body;
 
-  // API Routes
-  app.get("/api/ids", (req, res) => {
-    const { search } = req.query;
-    let query = "SELECT * FROM ids";
-    const params = [];
-    if (search) {
-      query += " WHERE full_name_am LIKE ? OR full_name_en LIKE ? OR phone LIKE ? OR id_number LIKE ?";
-      const s = `%${search}%`;
-      params.push(s, s, s, s);
-    }
-    query += " ORDER BY full_name_am ASC";
-    const rows = db.prepare(query).all(...params);
-    res.json(rows);
-  });
+  // Generate ID Number: BGR-POL-XXXXX
+  const lastId = db.prepare("SELECT id FROM ids ORDER BY id DESC LIMIT 1").get();
+  const nextId = (lastId?.id || 0) + 1;
+  const id_number = `BGR-POL-${String(nextId).padStart(5, '0')}`;
 
-  app.post("/api/ids", (req, res) => {
-    const { 
-      full_name_am, full_name_en, 
-      rank_am, rank_en, 
-      responsibility_am, responsibility_en, 
-      phone, photo_url, commissioner_signature
-    } = req.body;
+  const stmt = db.prepare(`
+    INSERT INTO ids (id_number, full_name_am, full_name_en, rank_am, rank_en, responsibility_am, responsibility_en, phone, photo_url, commissioner_signature)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+  
+  try {
+    stmt.run(id_number, full_name_am, full_name_en, rank_am, rank_en, responsibility_am, responsibility_en, phone, photo_url, commissioner_signature);
+    res.json({ success: true, id_number });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
-    // Generate ID Number: BGR-POL-XXXXX
-    const lastId = db.prepare("SELECT id FROM ids ORDER BY id DESC LIMIT 1").get();
-    const nextId = (lastId?.id || 0) + 1;
-    const id_number = `BGR-POL-${String(nextId).padStart(5, '0')}`;
+app.get("/api/ids/:id_number", (req, res) => {
+  const row = db.prepare("SELECT * FROM ids WHERE id_number = ?").get(req.params.id_number);
+  if (row) {
+    // Log scan
+    const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+    const ua = req.headers['user-agent'];
+    db.prepare("INSERT INTO scans (id_number, ip_address, user_agent) VALUES (?, ?, ?)").run(req.params.id_number, ip, ua);
+    res.json(row);
+  } else {
+    res.status(404).json({ error: "Not found" });
+  }
+});
 
-    const stmt = db.prepare(`
-      INSERT INTO ids (id_number, full_name_am, full_name_en, rank_am, rank_en, responsibility_am, responsibility_en, phone, photo_url, commissioner_signature)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    
-    try {
-      stmt.run(id_number, full_name_am, full_name_en, rank_am, rank_en, responsibility_am, responsibility_en, phone, photo_url, commissioner_signature);
-      res.json({ success: true, id_number });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
+app.get("/api/scans/:id_number", (req, res) => {
+  const rows = db.prepare("SELECT * FROM scans WHERE id_number = ? ORDER BY scanned_at DESC").all(req.params.id_number);
+  res.json(rows);
+});
 
-  app.get("/api/ids/:id_number", (req, res) => {
-    const row = db.prepare("SELECT * FROM ids WHERE id_number = ?").get(req.params.id_number);
-    if (row) {
-      // Log scan
-      const ip = req.headers['x-forwarded-for'] || req.socket.remoteAddress;
-      const ua = req.headers['user-agent'];
-      db.prepare("INSERT INTO scans (id_number, ip_address, user_agent) VALUES (?, ?, ?)").run(req.params.id_number, ip, ua);
-      res.json(row);
-    } else {
-      res.status(404).json({ error: "Not found" });
-    }
-  });
+// Assets (Flags/Logo)
+app.get("/api/assets", (req, res) => {
+  const rows = db.prepare("SELECT * FROM assets").all();
+  const assets = rows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
+  res.json(assets);
+});
 
-  app.get("/api/scans/:id_number", (req, res) => {
-    const rows = db.prepare("SELECT * FROM scans WHERE id_number = ? ORDER BY scanned_at DESC").all(req.params.id_number);
-    res.json(rows);
-  });
+app.post("/api/assets", (req, res) => {
+  const { key, value } = req.body;
+  db.prepare("INSERT OR REPLACE INTO assets (key, value) VALUES (?, ?)").run(key, value);
+  res.json({ success: true });
+});
 
-  // Assets (Flags/Logo)
-  app.get("/api/assets", (req, res) => {
-    const rows = db.prepare("SELECT * FROM assets").all();
-    const assets = rows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
-    res.json(assets);
-  });
+// --- Backup & Restore ---
+app.get("/api/backups", (req, res) => {
+  try {
+    const files = fs.readdirSync(BACKUP_DIR)
+      .filter(f => f.endsWith(".sqlite"))
+      .map(f => {
+        const stats = fs.statSync(path.join(BACKUP_DIR, f));
+        return {
+          filename: f,
+          size: stats.size,
+          createdAt: stats.mtime
+        };
+      })
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    res.json(files);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
 
-  app.post("/api/assets", (req, res) => {
-    const { key, value } = req.body;
-    db.prepare("INSERT OR REPLACE INTO assets (key, value) VALUES (?, ?)").run(key, value);
+app.post("/api/backups", async (req, res) => {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupPath = path.join(BACKUP_DIR, `backup-${timestamp}.sqlite`);
+  try {
+    await db.backup(backupPath);
+    res.json({ success: true, filename: `backup-${timestamp}.sqlite` });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.post("/api/backups/restore", async (req, res) => {
+  const { filename } = req.body;
+  const backupPath = path.join(BACKUP_DIR, filename);
+
+  if (!fs.existsSync(backupPath)) {
+    return res.status(404).json({ error: "Backup file not found" });
+  }
+
+  try {
+    // Close current connection
+    db.close();
+
+    // Copy backup to main db path
+    fs.copyFileSync(backupPath, DB_PATH);
+
+    // Re-open database
+    db = new Database(DB_PATH);
+
     res.json({ success: true });
-  });
+  } catch (e) {
+    // Attempt to re-open if it failed
+    db = new Database(DB_PATH);
+    res.status(500).json({ error: e.message });
+  }
+});
 
-  // --- Backup & Restore ---
-  app.get("/api/backups", (req, res) => {
-    try {
-      const files = fs.readdirSync(BACKUP_DIR)
-        .filter(f => f.endsWith(".sqlite"))
-        .map(f => {
-          const stats = fs.statSync(path.join(BACKUP_DIR, f));
-          return {
-            filename: f,
-            size: stats.size,
-            createdAt: stats.mtime
-          };
-        })
-        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-      res.json(files);
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post("/api/backups", async (req, res) => {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const backupPath = path.join(BACKUP_DIR, `backup-${timestamp}.sqlite`);
-    try {
-      await db.backup(backupPath);
-      res.json({ success: true, filename: `backup-${timestamp}.sqlite` });
-    } catch (e) {
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  app.post("/api/backups/restore", async (req, res) => {
-    const { filename } = req.body;
-    const backupPath = path.join(BACKUP_DIR, filename);
-
-    if (!fs.existsSync(backupPath)) {
-      return res.status(404).json({ error: "Backup file not found" });
-    }
-
-    try {
-      // Close current connection
-      db.close();
-
-      // Copy backup to main db path
-      fs.copyFileSync(backupPath, DB_PATH);
-
-      // Re-open database
-      db = new Database(DB_PATH);
-
-      res.json({ success: true });
-    } catch (e) {
-      // Attempt to re-open if it failed
-      db = new Database(DB_PATH);
-      res.status(500).json({ error: e.message });
-    }
-  });
-
-  // Daily Backup Scheduler (Simple implementation)
+// Daily Backup Scheduler (Simple implementation)
+if (!isVercel) {
   setInterval(async () => {
     const now = new Date();
     // Run at 2 AM
@@ -200,6 +197,10 @@ async function startServer() {
       }
     }
   }, 60000); // Check every minute
+}
+
+async function startServer() {
+  const PORT = 3000;
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
@@ -209,9 +210,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    app.use(express.static(path.join(__dirname, "dist")));
+    const distPath = path.join(__dirname, "dist");
+    app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(__dirname, "dist", "index.html"));
+      res.sendFile(path.join(distPath, "index.html"));
     });
   }
 
