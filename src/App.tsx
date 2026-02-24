@@ -342,17 +342,28 @@ export default function App() {
   };
 
   const fetchAssets = async () => {
-    const res = await fetch('/api/assets');
-    const data = await res.json();
-    setAssets(data);
+    try {
+      const res = await fetch('/api/assets');
+      if (!res.ok) throw new Error('Failed to fetch assets');
+      const data = await res.json();
+      setAssets(data);
+    } catch (e) {
+      console.error("Fetch assets error:", e);
+    }
   };
 
   const fetchRecords = async (search = '') => {
     setLoading(true);
-    const res = await fetch(`/api/ids?search=${search}`);
-    const data = await res.json();
-    setRecords(data);
-    setLoading(false);
+    try {
+      const res = await fetch(`/api/ids?search=${search}`);
+      if (!res.ok) throw new Error('Failed to fetch records');
+      const data = await res.json();
+      setRecords(data);
+    } catch (e) {
+      console.error("Fetch records error:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAssetUpload = async (key: keyof Assets, e: React.ChangeEvent<HTMLInputElement>) => {
@@ -361,12 +372,16 @@ export default function App() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = reader.result as string;
-      await fetch('/api/assets', {
+      const res = await fetch('/api/assets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key, value: base64 })
       });
-      fetchAssets();
+      if (res.ok) {
+        fetchAssets();
+      } else {
+        console.error("Asset upload failed");
+      }
     };
     reader.readAsDataURL(file);
   };
@@ -407,6 +422,9 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalData)
       });
+      
+      if (!res.ok) throw new Error('Failed to create ID');
+      
       const result = await res.json();
       if (result.success) {
         fetchRecords();

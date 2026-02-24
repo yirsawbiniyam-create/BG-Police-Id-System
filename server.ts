@@ -6,11 +6,12 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DB_PATH = "database.sqlite";
-const BACKUP_DIR = path.join(__dirname, "backups");
+const isVercel = process.env.VERCEL === '1';
+const DB_PATH = isVercel ? "/tmp/database.sqlite" : "database.sqlite";
+const BACKUP_DIR = isVercel ? "/tmp/backups" : path.join(__dirname, "backups");
 
 if (!fs.existsSync(BACKUP_DIR)) {
-  fs.mkdirSync(BACKUP_DIR);
+  fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }
 
 let db = new Database(DB_PATH);
@@ -46,8 +47,9 @@ db.exec(`
   );
 `);
 
+const app = express();
+
 async function startServer() {
-  const app = express();
   const PORT = 3000;
 
   app.use(express.json({ limit: '10mb' }));
@@ -218,4 +220,8 @@ async function startServer() {
   });
 }
 
-startServer();
+if (!isVercel) {
+  startServer();
+}
+
+export default app;
