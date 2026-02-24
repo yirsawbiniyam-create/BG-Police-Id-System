@@ -41,8 +41,11 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
   return (
     <div 
       ref={ref}
-      className="relative w-[85.6mm] h-[53.98mm] bg-gradient-to-br from-amber-400 via-amber-100 to-blue-600 rounded-[3.18mm] shadow-2xl overflow-hidden flex flex-col p-2 border border-amber-600/30 select-none"
-      style={{ printColorAdjust: 'exact' }}
+      className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] shadow-2xl overflow-hidden flex flex-col p-2 border border-amber-600/30 select-none"
+      style={{ 
+        printColorAdjust: 'exact',
+        background: 'linear-gradient(135deg, #fbbf24 0%, #fef3c7 50%, #2563eb 100%)'
+      }}
     >
       {/* Header */}
       <div className="flex justify-between items-center h-12 px-1">
@@ -126,46 +129,47 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
   return (
     <div 
       ref={ref}
-      className="relative w-[85.6mm] h-[53.98mm] bg-white rounded-xl shadow-2xl overflow-hidden flex flex-col p-4 border border-gray-200 select-none"
-      style={{ printColorAdjust: 'exact' }}
+      className="relative w-[85.6mm] h-[53.98mm] rounded-xl shadow-2xl overflow-hidden flex flex-col p-4 border border-gray-200 select-none"
+      style={{ 
+        printColorAdjust: 'exact',
+        backgroundColor: '#ffffff'
+      }}
     >
       {/* Watermark */}
       <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none">
         <img src={assets.police_logo || "https://picsum.photos/seed/logo/200/200"} className="w-48 h-48 object-contain" alt="Watermark" />
       </div>
 
-      <div className="relative z-10 flex flex-col h-full">
-        {/* Notice Text */}
-        <div className="flex-1 space-y-2">
-          <div className="text-center space-y-1">
-            <p className="text-[8px] font-bold text-gray-800 leading-tight">
-              ይህንን መታወቂያ የያዘ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን የፖሊስ አባል ነዉ፤ ህግን የማስከበር ስልጣን ተሰጥቶታል፡፡ ህግን ሲያስከብር መታወቂያዉን የማሳየት ግዴታ አለበት፡፡
-            </p>
-            <p className="text-[7px] font-medium text-gray-600 italic leading-tight">
-              This ID holder is a member of the Benishangul-Gumuz Region Police Commission; authorized to enforce the law. Must show ID when enforcing the law.
-            </p>
+      <div className="relative z-10 flex h-full gap-6 items-center">
+        {/* Left: Large QR Code Section */}
+        <div className="flex flex-col items-center justify-center space-y-2">
+          <span className="text-[7px] font-bold text-blue-900 uppercase tracking-wider">VERIFICATION / ማረጋገጫ</span>
+          <div className="p-2 bg-white border-2 border-slate-100 rounded-lg shadow-sm">
+            <QRCodeSVG 
+              value={`${window.location.origin}/verify/${data.id_number}`} 
+              size={110} 
+            />
           </div>
         </div>
 
-        {/* QR Code & Verification */}
-        <div className="flex justify-between items-end">
-          <div className="flex flex-col">
-            <span className="text-[6px] font-bold text-blue-900">VERIFICATION / ማረጋገጫ</span>
-            <div className="w-16 h-16 bg-white p-1 border border-gray-200 rounded-sm">
-              <QRCodeSVG 
-                value={`${window.location.origin}/verify/${data.id_number}`} 
-                size={64} 
-              />
-            </div>
+        {/* Right: Text and Signature */}
+        <div className="flex-1 flex flex-col justify-between h-full py-2">
+          <div className="space-y-3">
+            <p className="text-[9px] font-bold text-gray-800 leading-tight">
+              ይህንን መታወቂያ የያዘ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን የፖሊስ አባል ነዉ፤ ህግን የማስከበር ስልጣን ተሰጥቶታል፡፡ ህግን ሲያስከብር መታወቂያዉን የማሳየት ግዴታ አለበት፡፡
+            </p>
+            <p className="text-[8px] font-medium text-gray-600 italic leading-tight">
+              This ID holder is a member of the Benishangul-Gumuz Region Police Commission; authorized to enforce the law. Must show ID when enforcing the law.
+            </p>
           </div>
           
-          <div className="text-right flex flex-col items-center">
+          <div className="flex flex-col items-center self-end mt-4">
             {data.commissioner_signature ? (
-              <img src={data.commissioner_signature} className="h-8 w-24 object-contain mix-blend-multiply" alt="Signature" />
+              <img src={data.commissioner_signature} className="h-10 w-32 object-contain mix-blend-multiply" alt="Signature" />
             ) : (
-              <div className="h-8 w-24 border-b border-gray-400 mb-1"></div>
+              <div className="h-10 w-32 border-b border-gray-400 mb-1"></div>
             )}
-            <span className="text-[6px] font-bold text-gray-500">COMMISSIONER SIGNATURE / የኮሚሽነሩ ፊርማ</span>
+            <span className="text-[7px] font-bold text-gray-500 uppercase">COMMISSIONER SIGNATURE / የኮሚሽነሩ ፊርማ</span>
           </div>
         </div>
       </div>
@@ -198,10 +202,19 @@ export default function App() {
     commissioner_signature: ''
   });
 
+  const [printSide, setPrintSide] = useState<'front' | 'back' | 'both'>('both');
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     contentRef: printRef,
   });
+
+  const handlePrintSide = (side: 'front' | 'back' | 'both') => {
+    setPrintSide(side);
+    // Small delay to allow React to update the printRef content
+    setTimeout(() => {
+      handlePrint();
+    }, 100);
+  };
 
   const [showScans, setShowScans] = useState(false);
   const [scanHistory, setScanHistory] = useState<any[]>([]);
@@ -263,6 +276,9 @@ export default function App() {
   const handleDownload = async (idNumber: string, side: 'front' | 'back' | 'both') => {
     setLoading(true);
     try {
+      // Small delay to ensure all images/fonts are fully rendered
+      await new Promise(resolve => setTimeout(resolve, 500));
+
       if (side === 'both') {
         const front = document.getElementById(`card-front-${idNumber}`);
         const back = document.getElementById(`card-back-${idNumber}`);
@@ -293,6 +309,20 @@ export default function App() {
           scale: 3,
           useCORS: true,
           logging: false,
+          onclone: (clonedDoc) => {
+            // Force all elements to use computed RGB colors instead of oklch/oklab
+            const elements = clonedDoc.getElementsByTagName('*');
+            for (let i = 0; i < elements.length; i++) {
+              const el = elements[i] as HTMLElement;
+              const style = window.getComputedStyle(el);
+              if (style.color.includes('okl') || style.color.includes('oklch') || style.color.includes('oklab')) {
+                el.style.color = 'inherit';
+              }
+              if (style.backgroundColor.includes('okl') || style.backgroundColor.includes('oklch') || style.backgroundColor.includes('oklab')) {
+                el.style.backgroundColor = 'transparent';
+              }
+            }
+          }
         });
 
         const link = document.createElement('a');
@@ -317,6 +347,19 @@ export default function App() {
           useCORS: true,
           logging: false,
           backgroundColor: null,
+          onclone: (clonedDoc) => {
+            const elements = clonedDoc.getElementsByTagName('*');
+            for (let i = 0; i < elements.length; i++) {
+              const el = elements[i] as HTMLElement;
+              const style = window.getComputedStyle(el);
+              if (style.color.includes('okl') || style.color.includes('oklch') || style.color.includes('oklab')) {
+                el.style.color = 'inherit';
+              }
+              if (style.backgroundColor.includes('okl') || style.backgroundColor.includes('oklch') || style.backgroundColor.includes('oklab')) {
+                el.style.backgroundColor = 'transparent';
+              }
+            }
+          }
         });
         
         const link = document.createElement('a');
@@ -798,7 +841,7 @@ export default function App() {
                             <button 
                               onClick={() => {
                                 setSelectedRecord(record);
-                                handlePrint();
+                                handlePrintSide('both');
                               }}
                               className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
                             >
@@ -822,7 +865,7 @@ export default function App() {
             record={selectedRecord} 
             assets={assets} 
             onClose={() => setShowPreview(false)} 
-            onPrint={() => handlePrint()} 
+            onPrint={(side) => handlePrintSide(side)} 
             onDownload={(side) => handleDownload(selectedRecord.id_number, side)}
           />
         )}
@@ -873,17 +916,21 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Off-screen Print Content (Visible to print engine but not user) */}
+      {/* Off-screen Print Content */}
       <div className="fixed top-[-10000px] left-[-10000px] pointer-events-none">
         <div ref={printRef} className="print-container p-[5mm] bg-white">
           {selectedRecord && (
-            <div className="flex flex-col items-center gap-4">
-              <div className="print-card">
-                <IDCardFront data={selectedRecord} assets={assets} />
-              </div>
-              <div className="print-card">
-                <IDCardBack data={selectedRecord} assets={assets} />
-              </div>
+            <div className="flex flex-col items-center gap-8">
+              {(printSide === 'both' || printSide === 'front') && (
+                <div className="print-card">
+                  <IDCardFront data={selectedRecord} assets={assets} />
+                </div>
+              )}
+              {(printSide === 'both' || printSide === 'back') && (
+                <div className="print-card">
+                  <IDCardBack data={selectedRecord} assets={assets} />
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -894,7 +941,7 @@ export default function App() {
 
 // --- Helper Components ---
 
-function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record: IDRecord, assets: Assets, onClose: () => void, onPrint: () => void, onDownload: (side: 'front' | 'back' | 'both') => void }) {
+function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record: IDRecord, assets: Assets, onClose: () => void, onPrint: (side: 'front' | 'back' | 'both') => void, onDownload: (side: 'front' | 'back' | 'both') => void }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <motion.div 
@@ -908,7 +955,7 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record
         initial={{ opacity: 0, scale: 0.9, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
-        className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]"
+        className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[95vh]"
       >
         <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
           <div>
@@ -920,57 +967,83 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record
           </button>
         </div>
         
-        <div className="p-12 flex-1 overflow-y-auto bg-slate-50">
-          <div className="flex flex-col lg:flex-row items-center justify-center gap-16 min-h-full">
-            <div className="space-y-4 flex flex-col items-center">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Front Side / የፊት ገፅ</span>
-              <div id={`card-front-${record.id_number}`} className="scale-125 lg:scale-150 origin-center shadow-2xl rounded-[3.18mm]">
+        <div className="p-8 lg:p-12 flex-1 overflow-y-auto bg-slate-50">
+          <div className="flex flex-col lg:flex-row items-start justify-center gap-12 lg:gap-20 min-h-full">
+            {/* Front Side */}
+            <div className="space-y-6 flex flex-col items-center w-full lg:w-auto">
+              <div className="flex items-center justify-between w-full px-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Front Side / የፊት ገፅ</span>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => onPrint('front')}
+                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                    title="Print Front Only"
+                  >
+                    <Printer size={14} />
+                  </button>
+                  <button 
+                    onClick={() => onDownload('front')}
+                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                    title="Download Front Only"
+                  >
+                    <Download size={14} />
+                  </button>
+                </div>
+              </div>
+              <div id={`card-front-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-2xl rounded-[3.18mm]">
                 <IDCardFront data={record} assets={assets} />
               </div>
-              <button 
-                onClick={() => onDownload('front')}
-                className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700"
-              >
-                <Download size={14} /> Download Front
-              </button>
             </div>
 
-            <div className="space-y-4 flex flex-col items-center">
-              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Back Side / የጀርባ ገፅ</span>
-              <div id={`card-back-${record.id_number}`} className="scale-125 lg:scale-150 origin-center shadow-2xl rounded-[3.18mm]">
+            {/* Back Side */}
+            <div className="space-y-6 flex flex-col items-center w-full lg:w-auto">
+              <div className="flex items-center justify-between w-full px-2">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Back Side / የጀርባ ገፅ</span>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => onPrint('back')}
+                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                    title="Print Back Only"
+                  >
+                    <Printer size={14} />
+                  </button>
+                  <button 
+                    onClick={() => onDownload('back')}
+                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                    title="Download Back Only"
+                  >
+                    <Download size={14} />
+                  </button>
+                </div>
+              </div>
+              <div id={`card-back-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-2xl rounded-[3.18mm]">
                 <IDCardBack data={record} assets={assets} />
               </div>
-              <button 
-                onClick={() => onDownload('back')}
-                className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-600 hover:text-blue-700"
-              >
-                <Download size={14} /> Download Back
-              </button>
             </div>
           </div>
         </div>
 
-        <div className="p-8 bg-white border-t border-slate-100 flex justify-between items-center">
+        <div className="p-8 bg-white border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
           <button 
             onClick={onClose}
-            className="px-8 py-3 rounded-2xl font-bold text-slate-600 hover:bg-slate-100 transition-all"
+            className="w-full sm:w-auto px-8 py-3 rounded-2xl font-bold text-slate-600 hover:bg-slate-100 transition-all"
           >
             Back to Records
           </button>
-          <div className="flex gap-4">
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <button 
               onClick={() => onDownload('both')}
-              className="px-6 py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-all flex items-center gap-2"
+              className="px-6 py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
             >
               <Download size={20} />
-              Download Both
+              Download Full
             </button>
             <button 
-              onClick={onPrint}
-              className="px-10 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2"
+              onClick={() => onPrint('both')}
+              className="px-10 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
             >
               <Printer size={20} />
-              Print ID Card
+              Print Both Sides
             </button>
           </div>
         </div>

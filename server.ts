@@ -6,18 +6,33 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+console.log("Starting server script...");
 const isVercel = process.env.VERCEL === '1';
+console.log("isVercel:", isVercel);
+
 const DB_PATH = isVercel ? "/tmp/database.sqlite" : "database.sqlite";
 const BACKUP_DIR = isVercel ? "/tmp/backups" : path.join(__dirname, "backups");
+
+console.log("DB_PATH:", DB_PATH);
+console.log("BACKUP_DIR:", BACKUP_DIR);
 
 if (!fs.existsSync(BACKUP_DIR)) {
   fs.mkdirSync(BACKUP_DIR, { recursive: true });
 }
 
-let db = new Database(DB_PATH);
+let db: any;
+try {
+  console.log("Initializing database...");
+  db = new Database(DB_PATH);
+  console.log("Database initialized successfully.");
+} catch (err) {
+  console.error("Failed to initialize database:", err);
+  process.exit(1);
+}
 
 // Initialize database
-db.exec(`
+try {
+  db.exec(`
   CREATE TABLE IF NOT EXISTS ids (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     id_number TEXT UNIQUE,
@@ -46,8 +61,24 @@ db.exec(`
     value TEXT
   );
 `);
+  console.log("Database tables verified/created.");
+} catch (err) {
+  console.error("Failed to execute database initialization:", err);
+}
+
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+});
 
 const app = express();
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
 app.use(express.json({ limit: '10mb' }));
 
 // API Routes
@@ -204,6 +235,7 @@ if (!isVercel) {
 }
 
 async function startServer() {
+  console.log("Entering startServer...");
   const PORT = 3000;
 
   // Vite middleware for development
@@ -214,7 +246,10 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(__dirname, "..", "dist");
+    const distPath = path.join(__dirname, "dist");
+    if (!fs.existsSync(distPath)) {
+      console.error("ERROR: dist directory not found. Please run 'npm run build' first.");
+    }
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
@@ -223,6 +258,7 @@ async function startServer() {
 
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
+    console.log("Environment:", process.env.NODE_ENV || "development");
   });
 }
 
