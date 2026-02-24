@@ -2,10 +2,18 @@ import express from "express";
 import { createServer as createViteServer } from "vite";
 import Database from "better-sqlite3";
 import path from "path";
+import fs from "fs";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const db = new Database("database.sqlite");
+const DB_PATH = "database.sqlite";
+const BACKUP_DIR = path.join(__dirname, "backups");
+
+if (!fs.existsSync(BACKUP_DIR)) {
+  fs.mkdirSync(BACKUP_DIR);
+}
+
+let db = new Database(DB_PATH);
 
 // Initialize database
 db.exec(`
@@ -115,6 +123,81 @@ async function startServer() {
     db.prepare("INSERT OR REPLACE INTO assets (key, value) VALUES (?, ?)").run(key, value);
     res.json({ success: true });
   });
+
+  // --- Backup & Restore ---
+  app.get("/api/backups", (req, res) => {
+    try {
+      const files = fs.readdirSync(BACKUP_DIR)
+        .filter(f => f.endsWith(".sqlite"))
+        .map(f => {
+          const stats = fs.statSync(path.join(BACKUP_DIR, f));
+          return {
+            filename: f,
+            size: stats.size,
+            createdAt: stats.mtime
+          };
+        })
+        .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      res.json(files);
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/backups", async (req, res) => {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+    const backupPath = path.join(BACKUP_DIR, `backup-${timestamp}.sqlite`);
+    try {
+      await db.backup(backupPath);
+      res.json({ success: true, filename: `backup-${timestamp}.sqlite` });
+    } catch (e) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  app.post("/api/backups/restore", async (req, res) => {
+    const { filename } = req.body;
+    const backupPath = path.join(BACKUP_DIR, filename);
+
+    if (!fs.existsSync(backupPath)) {
+      return res.status(404).json({ error: "Backup file not found" });
+    }
+
+    try {
+      // Close current connection
+      db.close();
+
+      // Copy backup to main db path
+      fs.copyFileSync(backupPath, DB_PATH);
+
+      // Re-open database
+      db = new Database(DB_PATH);
+
+      res.json({ success: true });
+    } catch (e) {
+      // Attempt to re-open if it failed
+      db = new Database(DB_PATH);
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  // Daily Backup Scheduler (Simple implementation)
+  setInterval(async () => {
+    const now = new Date();
+    // Run at 2 AM
+    if (now.getHours() === 2 && now.getMinutes() === 0) {
+      const timestamp = now.toISOString().split('T')[0];
+      const backupPath = path.join(BACKUP_DIR, `daily-backup-${timestamp}.sqlite`);
+      if (!fs.existsSync(backupPath)) {
+        console.log(`Running daily backup: ${backupPath}`);
+        try {
+          await db.backup(backupPath);
+        } catch (e) {
+          console.error("Daily backup failed:", e);
+        }
+      }
+    }
+  }, 60000); // Check every minute
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {

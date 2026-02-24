@@ -4,7 +4,7 @@ import {
   Plus, History, Search, Printer, Download, 
   Shield, User, Phone, Briefcase, Award, 
   ChevronRight, Languages, Loader2, Camera,
-  Eye, X, Check
+  Eye, X, Check, Database as DbIcon, RefreshCw, HardDrive
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -61,6 +61,10 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
       <div className="text-center -mt-1">
         <h1 className="text-[7px] font-bold text-blue-900 leading-tight">የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
         <h2 className="text-[6px] font-semibold text-blue-800 uppercase tracking-tighter">Benishangul-Gumuz Region Police Commission</h2>
+        <div className="mt-0.5 border-t border-blue-900/20 pt-0.5">
+          <p className="text-[8px] font-black text-red-600 tracking-widest leading-none">የመታወቂያ ካርድ</p>
+          <p className="text-[6px] font-bold text-blue-900 uppercase tracking-widest">IDENTITY CARD</p>
+        </div>
       </div>
 
       {/* Main Content */}
@@ -172,7 +176,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
 // --- Main App ---
 
 export default function App() {
-  const [view, setView] = useState<'dashboard' | 'create' | 'history' | 'verify'>('dashboard');
+  const [view, setView] = useState<'dashboard' | 'create' | 'history' | 'verify' | 'maintenance'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [records, setRecords] = useState<IDRecord[]>([]);
   const [assets, setAssets] = useState<Assets>({});
@@ -180,6 +184,7 @@ export default function App() {
   const [translating, setTranslating] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<IDRecord | null>(null);
   const [showPreview, setShowPreview] = useState(false);
+  const [backups, setBackups] = useState<any[]>([]);
 
   const [formData, setFormData] = useState({
     full_name_am: '',
@@ -204,7 +209,56 @@ export default function App() {
   useEffect(() => {
     fetchAssets();
     fetchRecords();
+    fetchBackups();
   }, []);
+
+  const fetchBackups = async () => {
+    try {
+      const res = await fetch('/api/backups');
+      const data = await res.json();
+      setBackups(data);
+    } catch (e) {
+      console.error("Failed to fetch backups:", e);
+    }
+  };
+
+  const createBackup = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/backups', { method: 'POST' });
+      const data = await res.json();
+      if (data.success) {
+        fetchBackups();
+        alert(`Backup created successfully: ${data.filename}`);
+      }
+    } catch (e) {
+      alert("Backup failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const restoreBackup = async (filename: string) => {
+    if (!confirm(`Are you sure you want to restore from ${filename}? This will overwrite current data.`)) return;
+    setLoading(true);
+    try {
+      const res = await fetch('/api/backups/restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filename })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Database restored successfully. Refreshing data...");
+        fetchRecords();
+        fetchAssets();
+      }
+    } catch (e) {
+      alert("Restore failed");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleDownload = async (idNumber: string, side: 'front' | 'back' | 'both') => {
     setLoading(true);
@@ -400,6 +454,7 @@ export default function App() {
               <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<Shield size={18} />} label="Dashboard" />
               <NavButton active={view === 'create'} onClick={() => setView('create')} icon={<Plus size={18} />} label="New ID" />
               <NavButton active={view === 'history'} onClick={() => setView('history')} icon={<History size={18} />} label="Records" />
+              <NavButton active={view === 'maintenance'} onClick={() => setView('maintenance')} icon={<DbIcon size={18} />} label="Maintenance" />
             </div>
 
             <div className="flex items-center gap-4">
@@ -566,6 +621,91 @@ export default function App() {
             </motion.div>
           )}
 
+          {view === 'maintenance' && (
+            <motion.div 
+              key="maintenance"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="space-y-8"
+            >
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="text-3xl font-bold">System Maintenance</h2>
+                  <p className="text-slate-500">Manage database backups and system integrity</p>
+                </div>
+                <button 
+                  onClick={createBackup}
+                  disabled={loading}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-50"
+                >
+                  <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
+                  Backup Database Now
+                </button>
+              </div>
+
+              <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
+                <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+                  <HardDrive size={20} className="text-blue-600" />
+                  <h3 className="font-bold">Backup History</h3>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
+                        <th className="px-8 py-4">Filename</th>
+                        <th className="px-8 py-4">Date</th>
+                        <th className="px-8 py-4">Size</th>
+                        <th className="px-8 py-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {backups.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="px-8 py-12 text-center text-slate-400">
+                            No backups found.
+                          </td>
+                        </tr>
+                      ) : (
+                        backups.map((backup) => (
+                          <tr key={backup.filename} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-8 py-4 font-medium text-slate-700">{backup.filename}</td>
+                            <td className="px-8 py-4 text-slate-500 text-sm">
+                              {new Date(backup.createdAt).toLocaleString()}
+                            </td>
+                            <td className="px-8 py-4 text-slate-500 text-sm">
+                              {(backup.size / 1024 / 1024).toFixed(2)} MB
+                            </td>
+                            <td className="px-8 py-4 text-right">
+                              <button 
+                                onClick={() => restoreBackup(backup.filename)}
+                                className="px-4 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                              >
+                                Restore
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 flex gap-4 items-start">
+                <div className="p-3 bg-amber-100 rounded-2xl text-amber-600">
+                  <Shield size={24} />
+                </div>
+                <div>
+                  <h4 className="font-bold text-amber-900">Automatic Backups</h4>
+                  <p className="text-sm text-amber-800/80 mt-1">
+                    The system is configured to perform automatic daily backups at 2:00 AM. 
+                    These backups are stored securely on the server and can be restored from the list above.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
           {view === 'history' && (
             <motion.div 
               key="history"
