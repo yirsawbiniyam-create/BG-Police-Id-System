@@ -1,9 +1,24 @@
 import { GoogleGenAI, Type } from "@google/genai";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+let aiInstance: GoogleGenAI | null = null;
+
+function getAI() {
+  if (!aiInstance) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      console.warn("GEMINI_API_KEY is not set. Translation features will be disabled.");
+      return null;
+    }
+    aiInstance = new GoogleGenAI({ apiKey });
+  }
+  return aiInstance;
+}
 
 export async function translateText(text: string, targetLang: 'am' | 'en') {
   if (!text) return "";
+  
+  const ai = getAI();
+  if (!ai) return text;
   
   const prompt = targetLang === 'en' 
     ? `Translate the following Amharic text to English. Return ONLY the translated text: "${text}"`
