@@ -228,6 +228,7 @@ export default function App() {
   const fetchBackups = async () => {
     try {
       const res = await fetch('/api/backups');
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setBackups(data);
     } catch (e) {
@@ -239,13 +240,15 @@ export default function App() {
     setLoading(true);
     try {
       const res = await fetch('/api/backups', { method: 'POST' });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       if (data.success) {
         fetchBackups();
         alert(`Backup created successfully: ${data.filename}`);
       }
     } catch (e) {
-      alert("Backup failed");
+      console.error("Backup error:", e);
+      alert("Backup failed. Check console for details.");
     } finally {
       setLoading(false);
     }
@@ -260,6 +263,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename })
       });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       if (data.success) {
         alert("Database restored successfully. Refreshing data...");
@@ -267,7 +271,8 @@ export default function App() {
         fetchAssets();
       }
     } catch (e) {
-      alert("Restore failed");
+      console.error("Restore error:", e);
+      alert("Restore failed. Check console for details.");
     } finally {
       setLoading(false);
     }
@@ -378,10 +383,15 @@ export default function App() {
   };
 
   const fetchScans = async (idNumber: string) => {
-    const res = await fetch(`/api/scans/${idNumber}`);
-    const data = await res.json();
-    setScanHistory(data);
-    setShowScans(true);
+    try {
+      const res = await fetch(`/api/scans/${idNumber}`);
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const data = await res.json();
+      setScanHistory(data);
+      setShowScans(true);
+    } catch (e) {
+      console.error("Fetch scans error:", e);
+    }
   };
 
   const fetchAssets = async () => {
@@ -415,15 +425,22 @@ export default function App() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = reader.result as string;
-      const res = await fetch('/api/assets', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key, value: base64 })
-      });
-      if (res.ok) {
-        fetchAssets();
-      } else {
-        console.error("Asset upload failed");
+      try {
+        const res = await fetch('/api/assets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key, value: base64 })
+        });
+        if (res.ok) {
+          fetchAssets();
+        } else {
+          const errData = await res.json().catch(() => ({}));
+          console.error("Asset upload failed:", res.status, errData);
+          alert(`Asset upload failed: ${res.status} ${errData.error || ''}`);
+        }
+      } catch (error) {
+        console.error("Asset upload error:", error);
+        alert("Asset upload failed. Check console.");
       }
     };
     reader.readAsDataURL(file);

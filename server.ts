@@ -163,14 +163,9 @@ app.post("/api/assets", (req, res) => {
   res.json({ success: true });
 });
 
-// API 404 Handler - prevent falling through to SPA fallback
-app.use("/api/*", (req, res) => {
-  console.log(`API 404: ${req.method} ${req.originalUrl}`);
-  res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
-});
-
 // --- Backup & Restore ---
 app.get("/api/backups", (req, res) => {
+  console.log("GET /api/backups hit");
   try {
     const files = fs.readdirSync(BACKUP_DIR)
       .filter(f => f.endsWith(".sqlite"))
@@ -190,6 +185,7 @@ app.get("/api/backups", (req, res) => {
 });
 
 app.post("/api/backups", async (req, res) => {
+  console.log("POST /api/backups hit");
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const backupPath = path.join(BACKUP_DIR, `backup-${timestamp}.sqlite`);
   try {
@@ -201,6 +197,7 @@ app.post("/api/backups", async (req, res) => {
 });
 
 app.post("/api/backups/restore", async (req, res) => {
+  console.log("POST /api/backups/restore hit");
   const { filename } = req.body;
   const backupPath = path.join(BACKUP_DIR, filename);
 
@@ -224,6 +221,12 @@ app.post("/api/backups/restore", async (req, res) => {
     db = new Database(DB_PATH);
     res.status(500).json({ error: e.message });
   }
+});
+
+// API 404 Handler - prevent falling through to SPA fallback
+app.use("/api/*", (req, res) => {
+  console.log(`API 404: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
 });
 
 // Daily Backup Scheduler (Simple implementation)
