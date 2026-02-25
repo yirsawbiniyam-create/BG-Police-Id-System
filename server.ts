@@ -74,15 +74,21 @@ try {
 `);
   console.log("Database tables verified/created.");
 
-  // Ensure default admin user exists
+  // Ensure default admin user exists and has the correct password
   const adminUser = db.prepare("SELECT * FROM users WHERE username = ?").get("police");
+  const hashedPassword = bcrypt.hashSync("police1234", 10);
   if (!adminUser) {
-    const hashedPassword = bcrypt.hashSync("police1234", 10);
     db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("police", hashedPassword, "Administrator");
     console.log("Default admin user created: police / police1234");
   } else {
-    console.log("Admin user already exists.");
+    // Force update password to match request
+    db.prepare("UPDATE users SET password = ?, role = 'Administrator' WHERE username = ?").run(hashedPassword, "police");
+    console.log("Police user password updated to: police1234");
   }
+  
+  // Log all users for debugging
+  const allUsers = db.prepare("SELECT username, role FROM users").all();
+  console.log("Current users in DB:", allUsers);
 } catch (err) {
   console.error("Failed to execute database initialization:", err);
 }
