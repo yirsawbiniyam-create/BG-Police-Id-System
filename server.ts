@@ -140,20 +140,14 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", vercel: isVercel });
 });
 
-app.all(["/api/auth/login", "/api/auth/login/"], (req, res) => {
-  console.log(`Auth login hit: ${req.method} ${req.url}`);
+app.post("/api/auth/login", (req, res) => {
+  console.log("POST /api/auth/login hit", req.body);
+  const { username, password } = req.body;
   
-  if (req.method === "GET") {
-    return res.json({ message: "Login endpoint is active. Please use POST." });
-  }
-  
-  if (req.method !== "POST") {
-    return res.status(405).json({ error: `Method ${req.method} not allowed` });
+  if (!username || !password) {
+    return res.status(400).json({ error: "Username and password are required" });
   }
 
-  const { username, password } = req.body;
-  console.log("Login attempt for:", username);
-  
   const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username);
 
   if (!user || !bcrypt.compareSync(password, user.password)) {
@@ -164,6 +158,15 @@ app.all(["/api/auth/login", "/api/auth/login/"], (req, res) => {
   console.log("Login successful for:", username);
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
   res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
+});
+
+app.post("/api/auth/login/", (req, res) => {
+  console.log("POST /api/auth/login/ hit (redirecting to non-slash)");
+  res.redirect(307, "/api/auth/login");
+});
+
+app.get("/api/auth/login", (req, res) => {
+  res.json({ message: "Please use POST to login" });
 });
 
 // User Management (Admin only)
