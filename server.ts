@@ -76,15 +76,15 @@ try {
   console.log("Database tables verified/created.");
 
   // Ensure default admin user exists and has the correct password
-  const adminUser = db.prepare("SELECT * FROM users WHERE username = ?").get("police");
-  const hashedPassword = bcrypt.hashSync("police1234", 10);
+  const adminUser = db.prepare("SELECT * FROM users WHERE username = ? COLLATE NOCASE").get("POLICE");
+  const hashedPassword = bcrypt.hashSync("POLICE1234", 10);
   if (!adminUser) {
-    db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("police", hashedPassword, "Administrator");
-    console.log("Default admin user created: police / police1234");
+    db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("POLICE", hashedPassword, "Administrator");
+    console.log("Default admin user created: POLICE / POLICE1234");
   } else {
     // Force update password to match request
-    db.prepare("UPDATE users SET password = ?, role = 'Administrator' WHERE username = ?").run(hashedPassword, "police");
-    console.log("Police user password updated to: police1234");
+    db.prepare("UPDATE users SET password = ?, role = 'Administrator' WHERE username = ? COLLATE NOCASE").run(hashedPassword, "POLICE");
+    console.log("POLICE user password updated to: POLICE1234");
   }
   
   // Log all users for debugging
@@ -154,7 +154,7 @@ app.post(["/api/auth/login", "/api/auth/login/"], (req, res) => {
   }
 
   try {
-    const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username);
+    const user = db.prepare("SELECT * FROM users WHERE username = ? COLLATE NOCASE").get(username);
 
     if (!user || !bcrypt.compareSync(password, user.password)) {
       console.log("[LOGIN_DEBUG] Invalid credentials for:", username);
@@ -176,6 +176,12 @@ app.get("/api/auth/login", (req, res) => {
 
 app.get("/api/auth/login-status", (req, res) => {
   res.json({ status: "active", methods: ["POST"] });
+});
+
+// Catch-all for unhandled API routes
+app.all("/api/*", (req, res) => {
+  console.log(`[API_DEBUG] Unhandled ${req.method} request to ${req.url}`);
+  res.status(404).json({ error: `API route ${req.method} ${req.url} not found` });
 });
 
 // User Management (Admin only)

@@ -276,7 +276,17 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(credentials)
       });
-      const data = await res.json();
+      
+      let data;
+      const contentType = res.headers.get("content-type");
+      if (contentType && contentType.indexOf("application/json") !== -1) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        console.error("Non-JSON response:", text);
+        data = { error: `Server returned non-JSON response (${res.status})` };
+      }
+
       if (res.ok) {
         setToken(data.token);
         setUser(data.user);
@@ -284,13 +294,14 @@ export default function App() {
         localStorage.setItem('user', JSON.stringify(data.user));
       } else {
         if (res.status === 405) {
-          alert('Server Error: Method Not Allowed (405). This usually means the API routing is not correctly configured on the server.');
+          alert('Server Error: Method Not Allowed (405). The API endpoint exists but does not support POST requests. Please check Vercel routing.');
         } else {
           alert(data.error || `Login failed (${res.status})`);
         }
       }
     } catch (e) {
-      alert('Login error');
+      console.error("Login fetch error:", e);
+      alert('Login error: Could not connect to the server. Please check your internet connection or if the server is down.');
     } finally {
       setLoading(false);
     }
@@ -1362,7 +1373,7 @@ function Login({ onLogin, loading }: { onLogin: (c: any) => void, loading: boole
           </button>
           <div className="text-center space-y-1">
             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-              Default: police / police1234
+              DEFAULT: POLICE / POLICE1234
             </p>
           </div>
         </form>
