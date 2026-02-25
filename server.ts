@@ -75,11 +75,11 @@ try {
   console.log("Database tables verified/created.");
 
   // Ensure default admin user exists
-  const adminUser = db.prepare("SELECT * FROM users WHERE username = ?").get("admin");
+  const adminUser = db.prepare("SELECT * FROM users WHERE username = ?").get("police");
   if (!adminUser) {
-    const hashedPassword = bcrypt.hashSync("admin123", 10);
-    db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("admin", hashedPassword, "Administrator");
-    console.log("Default admin user created: admin / admin123");
+    const hashedPassword = bcrypt.hashSync("police1234", 10);
+    db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("police", hashedPassword, "Administrator");
+    console.log("Default admin user created: police / police1234");
   } else {
     console.log("Admin user already exists.");
   }

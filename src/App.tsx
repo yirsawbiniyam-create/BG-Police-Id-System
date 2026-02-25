@@ -1358,7 +1358,7 @@ function Login({ onLogin, loading }: { onLogin: (c: any) => void, loading: boole
           </button>
           <div className="text-center space-y-1">
             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-              Default: admin / admin123
+              Default: police / police1234
             </p>
           </div>
         </form>
