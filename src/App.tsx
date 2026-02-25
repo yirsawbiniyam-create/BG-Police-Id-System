@@ -1307,7 +1307,7 @@ function Login({ onLogin, loading }: { onLogin: (c: any) => void, loading: boole
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin({ username, password });
+    onLogin({ username: username.trim(), password });
   };
 
   return (
@@ -1356,9 +1356,11 @@ function Login({ onLogin, loading }: { onLogin: (c: any) => void, loading: boole
             {loading && <Loader2 className="animate-spin" size={18} />}
             Sign In
           </button>
-          <p className="text-center text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-            Authorized Personnel Only
-          </p>
+          <div className="text-center space-y-1">
+            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+              Default: admin / admin123
+            </p>
+          </div>
         </form>
       </motion.div>
     </div>

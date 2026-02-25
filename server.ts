@@ -74,12 +74,14 @@ try {
 `);
   console.log("Database tables verified/created.");
 
-  // Create default admin if no users exist
-  const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
-  if (userCount === 0) {
+  // Ensure default admin user exists
+  const adminUser = db.prepare("SELECT * FROM users WHERE username = ?").get("admin");
+  if (!adminUser) {
     const hashedPassword = bcrypt.hashSync("admin123", 10);
     db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("admin", hashedPassword, "Administrator");
     console.log("Default admin user created: admin / admin123");
+  } else {
+    console.log("Admin user already exists.");
   }
 } catch (err) {
   console.error("Failed to execute database initialization:", err);
