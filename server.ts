@@ -4,8 +4,11 @@ import Database from "better-sqlite3";
 import path from "path";
 import fs from "fs";
 import { fileURLToPath } from "url";
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const JWT_SECRET = process.env.JWT_SECRET || "police-id-secret-key-2026";
 console.log("Starting server script...");
 const isVercel = process.env.VERCEL === '1';
 console.log("isVercel:", isVercel);
@@ -60,8 +63,24 @@ try {
     key TEXT PRIMARY KEY,
     value TEXT
   );
+
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE,
+    password TEXT,
+    role TEXT, -- 'Administrator', 'Data Entry', 'Viewer'
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
   console.log("Database tables verified/created.");
+
+  // Create default admin if no users exist
+  const userCount = db.prepare("SELECT COUNT(*) as count FROM users").get().count;
+  if (userCount === 0) {
+    const hashedPassword = bcrypt.hashSync("admin123", 10);
+    db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run("admin", hashedPassword, "Administrator");
+    console.log("Default admin user created: admin / admin123");
+  }
 } catch (err) {
   console.error("Failed to execute database initialization:", err);
 }
@@ -81,12 +100,83 @@ app.use((req, res, next) => {
 });
 app.use(express.json({ limit: '50mb' }));
 
+// Auth Middleware
+const authenticateToken = (req: any, res: any, next: any) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) return res.status(401).json({ error: "Unauthorized" });
+
+  jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+    if (err) return res.status(403).json({ error: "Forbidden" });
+    req.user = user;
+    next();
+  });
+};
+
+const authorizeRole = (roles: string[]) => {
+  return (req: any, res: any, next: any) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      return res.status(403).json({ error: "Access denied" });
+    }
+    next();
+  };
+};
+
 // API Routes
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", vercel: isVercel });
 });
 
-app.get("/api/ids", (req, res) => {
+app.post("/api/auth/login", (req, res) => {
+  const { username, password } = req.body;
+  const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username);
+
+  if (!user || !bcrypt.compareSync(password, user.password)) {
+    return res.status(401).json({ error: "Invalid username or password" });
+  }
+
+  const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+  res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
+});
+
+// User Management (Admin only)
+app.get("/api/users", authenticateToken, authorizeRole(['Administrator']), (req, res) => {
+  const users = db.prepare("SELECT id, username, role, created_at FROM users").all();
+  res.json(users);
+});
+
+app.post("/api/users", authenticateToken, authorizeRole(['Administrator']), (req, res) => {
+  const { username, password, role } = req.body;
+  const hashedPassword = bcrypt.hashSync(password, 10);
+  try {
+    db.prepare("INSERT INTO users (username, password, role) VALUES (?, ?, ?)").run(username, hashedPassword, role);
+    res.json({ success: true });
+  } catch (e) {
+    res.status(400).json({ error: "Username already exists" });
+  }
+});
+
+app.put("/api/users/:id", authenticateToken, authorizeRole(['Administrator']), (req, res) => {
+  const { role } = req.body;
+  db.prepare("UPDATE users SET role = ? WHERE id = ?").run(role, req.params.id);
+  res.json({ success: true });
+});
+
+app.delete("/api/users/:id", authenticateToken, authorizeRole(['Administrator']), (req, res) => {
+  // Prevent deleting the last admin
+  const adminCount = db.prepare("SELECT COUNT(*) as count FROM users WHERE role = 'Administrator'").get().count;
+  const userToDelete = db.prepare("SELECT role FROM users WHERE id = ?").get(req.params.id);
+  
+  if (userToDelete?.role === 'Administrator' && adminCount <= 1) {
+    return res.status(400).json({ error: "Cannot delete the last administrator" });
+  }
+
+  db.prepare("DELETE FROM users WHERE id = ?").run(req.params.id);
+  res.json({ success: true });
+});
+
+app.get("/api/ids", authenticateToken, (req, res) => {
   console.log("GET /api/ids hit");
   const { search } = req.query;
   let query = "SELECT * FROM ids";
@@ -101,7 +191,7 @@ app.get("/api/ids", (req, res) => {
   res.json(rows);
 });
 
-app.post("/api/ids", (req, res) => {
+app.post("/api/ids", authenticateToken, authorizeRole(['Administrator', 'Data Entry']), (req, res) => {
   const { 
     full_name_am, full_name_en, 
     rank_am, rank_en, 
@@ -128,6 +218,8 @@ app.post("/api/ids", (req, res) => {
 });
 
 app.get("/api/ids/:id_number", (req, res) => {
+  // Publicly accessible for scanning, but maybe we want to restrict it?
+  // For now, keep it public as it's for verification.
   const row = db.prepare("SELECT * FROM ids WHERE id_number = ?").get(req.params.id_number);
   if (row) {
     // Log scan
@@ -140,20 +232,20 @@ app.get("/api/ids/:id_number", (req, res) => {
   }
 });
 
-app.get("/api/scans/:id_number", (req, res) => {
+app.get("/api/scans/:id_number", authenticateToken, (req, res) => {
   const rows = db.prepare("SELECT * FROM scans WHERE id_number = ? ORDER BY scanned_at DESC").all(req.params.id_number);
   res.json(rows);
 });
 
 // Assets (Flags/Logo)
-app.get("/api/assets", (req, res) => {
+app.get("/api/assets", authenticateToken, (req, res) => {
   console.log("GET /api/assets hit");
   const rows = db.prepare("SELECT * FROM assets").all();
   const assets = rows.reduce((acc, row) => ({ ...acc, [row.key]: row.value }), {});
   res.json(assets);
 });
 
-app.post("/api/assets", (req, res) => {
+app.post("/api/assets", authenticateToken, authorizeRole(['Administrator']), (req, res) => {
   console.log("POST /api/assets hit", req.body?.key);
   const { key, value } = req.body;
   if (!key || !value) {
@@ -164,7 +256,7 @@ app.post("/api/assets", (req, res) => {
 });
 
 // --- Backup & Restore ---
-app.get("/api/backups", (req, res) => {
+app.get("/api/backups", authenticateToken, authorizeRole(['Administrator']), (req, res) => {
   console.log("GET /api/backups hit");
   try {
     const files = fs.readdirSync(BACKUP_DIR)
@@ -184,7 +276,7 @@ app.get("/api/backups", (req, res) => {
   }
 });
 
-app.post("/api/backups", async (req, res) => {
+app.post("/api/backups", authenticateToken, authorizeRole(['Administrator']), async (req, res) => {
   console.log("POST /api/backups hit");
   const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
   const backupPath = path.join(BACKUP_DIR, `backup-${timestamp}.sqlite`);
@@ -196,7 +288,7 @@ app.post("/api/backups", async (req, res) => {
   }
 });
 
-app.post("/api/backups/restore", async (req, res) => {
+app.post("/api/backups/restore", authenticateToken, authorizeRole(['Administrator']), async (req, res) => {
   console.log("POST /api/backups/restore hit");
   const { filename } = req.body;
   const backupPath = path.join(BACKUP_DIR, filename);

@@ -29,6 +29,12 @@ interface IDRecord {
   created_at: string;
 }
 
+interface User {
+  id: number;
+  username: string;
+  role: 'Administrator' | 'Data Entry' | 'Viewer';
+}
+
 interface Assets {
   bgr_flag?: string;
   eth_flag?: string;
@@ -41,30 +47,30 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
   return (
     <div 
       ref={ref}
-      className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] shadow-2xl overflow-hidden flex flex-col p-2 border border-amber-600/30 select-none"
+      className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] overflow-hidden flex flex-col p-2 border border-[#d977064d] select-none"
       style={{ 
         printColorAdjust: 'exact',
         background: 'linear-gradient(135deg, #fbbf24 0%, #fef3c7 50%, #2563eb 100%)'
       }}
     >
       {/* Header */}
-      <div className="flex justify-between items-center h-12 px-1">
-        <img src={assets.bgr_flag || "https://picsum.photos/seed/bgr/100/60"} className="h-8 w-12 object-cover rounded-sm shadow-sm" alt="BGR Flag" />
-        <div className="w-12 h-12 rounded-full flex items-center justify-center overflow-hidden">
+      <div className="flex justify-between items-center h-16 px-1">
+        <img src={assets.bgr_flag || "https://picsum.photos/seed/bgr/100/60"} className="h-10 w-16 object-cover rounded-sm shadow-sm" alt="BGR Flag" />
+        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-sm border border-[#1e3a8a1a] -mt-4">
           <img 
-            src={assets.police_logo || "https://picsum.photos/seed/logo/80/80"} 
-            className="w-11 h-11 object-contain mix-blend-multiply" 
+            src={assets.police_logo || "https://picsum.photos/seed/logo/120/120"} 
+            className="w-18 h-18 object-contain" 
             alt="Police Logo" 
           />
         </div>
-        <img src={assets.eth_flag || "https://picsum.photos/seed/eth/100/60"} className="h-8 w-12 object-cover rounded-sm shadow-sm" alt="ETH Flag" />
+        <img src={assets.eth_flag || "https://picsum.photos/seed/eth/100/60"} className="h-10 w-16 object-cover rounded-sm shadow-sm" alt="ETH Flag" />
       </div>
 
       {/* Commission Name */}
       <div className="text-center -mt-1">
-        <h1 className="text-[7px] font-bold text-blue-900 leading-tight">የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
-        <h2 className="text-[6px] font-semibold text-blue-800 uppercase tracking-tighter">Benishangul-Gumuz Region Police Commission</h2>
-        <div className="mt-0.5 border-t border-blue-900/20 pt-0.5">
+        <h1 className="text-[8px] font-bold text-blue-900 leading-tight">የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
+        <h2 className="text-[7px] font-semibold text-blue-800 uppercase tracking-tighter">Benishangul-Gumuz Region Police Commission</h2>
+        <div className="mt-0.5 border-t border-[#1e3a8a33] pt-0.5">
           <p className="text-[8px] font-black text-red-600 tracking-widest leading-none">የመታወቂያ ካርድ</p>
           <p className="text-[6px] font-bold text-blue-900 uppercase tracking-widest">IDENTITY CARD</p>
         </div>
@@ -75,40 +81,40 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
         {/* Left Side: Details */}
         <div className="flex-1 flex flex-col justify-center space-y-0.5 pl-1">
           <div className="flex flex-col">
-            <span className="text-[5px] text-blue-900/70 font-bold">ID NO / መታወቂያ ቁጥር</span>
+            <span className="text-[5px] text-[#1e3a8ab3] font-bold">ID NO / መታወቂያ ቁጥር</span>
             <span className="text-[8px] font-black text-blue-900">{data.id_number || "BGR-POL-00000"}</span>
           </div>
           
           <div className="flex flex-col">
-            <span className="text-[5px] text-blue-900/70 font-bold">FULL NAME / ሙሉ ስም</span>
+            <span className="text-[5px] text-[#1e3a8ab3] font-bold">FULL NAME / ሙሉ ስም</span>
             <span className="text-[7px] font-bold text-gray-900 leading-none">{data.full_name_am}</span>
             <span className="text-[6px] font-medium text-gray-800 uppercase">{data.full_name_en}</span>
           </div>
 
           <div className="grid grid-cols-2 gap-1">
             <div className="flex flex-col">
-              <span className="text-[5px] text-blue-900/70 font-bold">RANK / ማዕረግ</span>
+              <span className="text-[5px] text-[#1e3a8ab3] font-bold">RANK / ማዕረግ</span>
               <span className="text-[6px] font-bold text-gray-900">{data.rank_am} / {data.rank_en}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[5px] text-blue-900/70 font-bold">PHONE / ስልክ</span>
+              <span className="text-[5px] text-[#1e3a8ab3] font-bold">PHONE / ስልክ</span>
               <span className="text-[6px] font-bold text-gray-900">{data.phone}</span>
             </div>
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[5px] text-blue-900/70 font-bold">RESPONSIBILITY / ሀላፊነት</span>
+            <span className="text-[5px] text-[#1e3a8ab3] font-bold">RESPONSIBILITY / ሀላፊነት</span>
             <span className="text-[6px] font-bold text-gray-900">{data.responsibility_am} / {data.responsibility_en}</span>
           </div>
         </div>
 
         {/* Right Side: Photo & Barcode */}
         <div className="w-20 flex flex-col items-center justify-center pr-1">
-          <div className="w-16 h-20 bg-white/50 border-2 border-amber-500 rounded-md overflow-hidden shadow-inner">
+          <div className="w-16 h-20 bg-white border-2 border-amber-500 rounded-md overflow-hidden shadow-inner">
             {data.photo_url ? (
               <img src={data.photo_url} className="w-full h-full object-cover" alt="Member" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-amber-600/30">
+              <div className="w-full h-full flex items-center justify-center text-[#d977064d]">
                 <User size={32} />
               </div>
             )}
@@ -129,7 +135,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
   return (
     <div 
       ref={ref}
-      className="relative w-[85.6mm] h-[53.98mm] rounded-xl shadow-2xl overflow-hidden flex flex-col p-4 border border-gray-200 select-none"
+      className="relative w-[85.6mm] h-[53.98mm] rounded-xl overflow-hidden flex flex-col p-4 border border-gray-200 select-none"
       style={{ 
         printColorAdjust: 'exact',
         backgroundColor: '#ffffff'
@@ -180,7 +186,9 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
 // --- Main App ---
 
 export default function App() {
-  const [view, setView] = useState<'dashboard' | 'create' | 'history' | 'verify' | 'maintenance'>('dashboard');
+  const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
+  const [view, setView] = useState<'dashboard' | 'create' | 'history' | 'verify' | 'maintenance' | 'users'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [records, setRecords] = useState<IDRecord[]>([]);
   const [assets, setAssets] = useState<Assets>({});
@@ -220,14 +228,72 @@ export default function App() {
   const [scanHistory, setScanHistory] = useState<any[]>([]);
 
   useEffect(() => {
-    fetchAssets();
-    fetchRecords();
-    fetchBackups();
+    const savedToken = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+    if (savedToken && savedUser) {
+      setToken(savedToken);
+      setUser(JSON.parse(savedUser));
+    }
   }, []);
+
+  useEffect(() => {
+    if (token) {
+      fetchAssets();
+      fetchRecords();
+      if (user?.role === 'Administrator') {
+        fetchBackups();
+      }
+    }
+  }, [token, user]);
+
+  const apiFetch = async (url: string, options: any = {}) => {
+    const headers = {
+      ...options.headers,
+      'Authorization': `Bearer ${token}`
+    };
+    const res = await fetch(url, { ...options, headers });
+    if (res.status === 401 || res.status === 403) {
+      handleLogout();
+      throw new Error('Session expired');
+    }
+    return res;
+  };
+
+  const handleLogin = async (credentials: any) => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(credentials)
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setToken(data.token);
+        setUser(data.user);
+        localStorage.setItem('token', data.token);
+        localStorage.setItem('user', JSON.stringify(data.user));
+      } else {
+        alert(data.error || 'Login failed');
+      }
+    } catch (e) {
+      alert('Login error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    setToken(null);
+    setUser(null);
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    setView('dashboard');
+  };
 
   const fetchBackups = async () => {
     try {
-      const res = await fetch('/api/backups');
+      const res = await apiFetch('/api/backups');
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setBackups(data);
@@ -239,7 +305,7 @@ export default function App() {
   const createBackup = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/backups', { method: 'POST' });
+      const res = await apiFetch('/api/backups', { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       if (data.success) {
@@ -258,7 +324,7 @@ export default function App() {
     if (!confirm(`Are you sure you want to restore from ${filename}? This will overwrite current data.`)) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/backups/restore', {
+      const res = await apiFetch('/api/backups/restore', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ filename })
@@ -293,39 +359,59 @@ export default function App() {
         const container = document.createElement('div');
         container.style.display = 'flex';
         container.style.flexDirection = 'column';
-        container.style.gap = '20px';
-        container.style.padding = '20px';
+        container.style.alignItems = 'center';
+        container.style.gap = '40px';
+        container.style.padding = '40px';
         container.style.backgroundColor = 'white';
         container.style.position = 'fixed';
         container.style.top = '-10000px';
+        container.style.left = '-10000px';
         
         const frontClone = front.cloneNode(true) as HTMLElement;
         const backClone = back.cloneNode(true) as HTMLElement;
         
-        // Reset scales on clones
+        // Reset scales and shadows on clones for clean capture
         frontClone.style.transform = 'none';
+        frontClone.style.boxShadow = 'none';
+        frontClone.style.margin = '0';
+        
         backClone.style.transform = 'none';
+        backClone.style.boxShadow = 'none';
+        backClone.style.margin = '0';
         
         container.appendChild(frontClone);
         container.appendChild(backClone);
         document.body.appendChild(container);
 
         const canvas = await html2canvas(container, {
-          scale: 3,
+          scale: 4,
           useCORS: true,
           logging: false,
+          backgroundColor: '#ffffff',
           onclone: (clonedDoc) => {
-            // Force all elements to use computed RGB colors instead of oklch/oklab
             const elements = clonedDoc.getElementsByTagName('*');
             for (let i = 0; i < elements.length; i++) {
               const el = elements[i] as HTMLElement;
               const style = window.getComputedStyle(el);
-              if (style.color.includes('okl') || style.color.includes('oklch') || style.color.includes('oklab')) {
-                el.style.color = 'inherit';
-              }
-              if (style.backgroundColor.includes('okl') || style.backgroundColor.includes('oklch') || style.backgroundColor.includes('oklab')) {
-                el.style.backgroundColor = 'transparent';
-              }
+              
+              // Check all relevant color properties
+              const props = ['color', 'background-color', 'border-color', 'box-shadow', 'fill', 'stroke'];
+              props.forEach(prop => {
+                const value = style.getPropertyValue(prop);
+                if (value && (value.includes('oklch') || value.includes('oklab'))) {
+                  // Force a safe fallback
+                  if (prop === 'box-shadow') {
+                    el.style.setProperty(prop, 'none', 'important');
+                  } else if (prop === 'background-color') {
+                    // Try to keep it transparent if it's a modern color we can't parse
+                    el.style.setProperty(prop, 'transparent', 'important');
+                  } else if (prop === 'border-color') {
+                    el.style.setProperty(prop, 'currentColor', 'important');
+                  } else {
+                    el.style.setProperty(prop, 'inherit', 'important');
+                  }
+                }
+              });
             }
           }
         });
@@ -357,12 +443,22 @@ export default function App() {
             for (let i = 0; i < elements.length; i++) {
               const el = elements[i] as HTMLElement;
               const style = window.getComputedStyle(el);
-              if (style.color.includes('okl') || style.color.includes('oklch') || style.color.includes('oklab')) {
-                el.style.color = 'inherit';
-              }
-              if (style.backgroundColor.includes('okl') || style.backgroundColor.includes('oklch') || style.backgroundColor.includes('oklab')) {
-                el.style.backgroundColor = 'transparent';
-              }
+              
+              const props = ['color', 'background-color', 'border-color', 'box-shadow', 'fill', 'stroke'];
+              props.forEach(prop => {
+                const value = style.getPropertyValue(prop);
+                if (value && (value.includes('oklch') || value.includes('oklab'))) {
+                  if (prop === 'box-shadow') {
+                    el.style.setProperty(prop, 'none', 'important');
+                  } else if (prop === 'background-color') {
+                    el.style.setProperty(prop, 'transparent', 'important');
+                  } else if (prop === 'border-color') {
+                    el.style.setProperty(prop, 'currentColor', 'important');
+                  } else {
+                    el.style.setProperty(prop, 'inherit', 'important');
+                  }
+                }
+              });
             }
           }
         });
@@ -384,7 +480,7 @@ export default function App() {
 
   const fetchScans = async (idNumber: string) => {
     try {
-      const res = await fetch(`/api/scans/${idNumber}`);
+      const res = await apiFetch(`/api/scans/${idNumber}`);
       if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setScanHistory(data);
@@ -396,7 +492,7 @@ export default function App() {
 
   const fetchAssets = async () => {
     try {
-      const res = await fetch('/api/assets');
+      const res = await apiFetch('/api/assets');
       if (!res.ok) throw new Error('Failed to fetch assets');
       const data = await res.json();
       setAssets(data);
@@ -408,7 +504,7 @@ export default function App() {
   const fetchRecords = async (search = '') => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/ids?search=${search}`);
+      const res = await apiFetch(`/api/ids?search=${search}`);
       if (!res.ok) throw new Error('Failed to fetch records');
       const data = await res.json();
       setRecords(data);
@@ -426,7 +522,7 @@ export default function App() {
     reader.onloadend = async () => {
       const base64 = reader.result as string;
       try {
-        const res = await fetch('/api/assets', {
+        const res = await apiFetch('/api/assets', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ key, value: base64 })
@@ -477,7 +573,7 @@ export default function App() {
         }
       }
 
-      const res = await fetch('/api/ids', {
+      const res = await apiFetch('/api/ids', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalData)
@@ -513,6 +609,10 @@ export default function App() {
     return <VerificationView idNumber={idNum} assets={assets} />;
   }
 
+  if (!token) {
+    return <Login onLogin={handleLogin} loading={loading} />;
+  }
+
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-slate-900 font-sans">
       {/* Navigation */}
@@ -531,9 +631,16 @@ export default function App() {
             
             <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
               <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<Shield size={18} />} label="Dashboard" />
-              <NavButton active={view === 'create'} onClick={() => setView('create')} icon={<Plus size={18} />} label="New ID" />
+              {(user?.role === 'Administrator' || user?.role === 'Data Entry') && (
+                <NavButton active={view === 'create'} onClick={() => setView('create')} icon={<Plus size={18} />} label="New ID" />
+              )}
               <NavButton active={view === 'history'} onClick={() => setView('history')} icon={<History size={18} />} label="Records" />
-              <NavButton active={view === 'maintenance'} onClick={() => setView('maintenance')} icon={<DbIcon size={18} />} label="Maintenance" />
+              {user?.role === 'Administrator' && (
+                <>
+                  <NavButton active={view === 'maintenance'} onClick={() => setView('maintenance')} icon={<DbIcon size={18} />} label="Maintenance" />
+                  <NavButton active={view === 'users'} onClick={() => setView('users')} icon={<User size={18} />} label="Users" />
+                </>
+              )}
             </div>
 
             <div className="flex items-center gap-4">
@@ -549,6 +656,19 @@ export default function App() {
                     fetchRecords(e.target.value);
                   }}
                 />
+              </div>
+              <div className="flex items-center gap-2 pl-4 border-l border-slate-200">
+                <div className="text-right hidden sm:block">
+                  <p className="text-xs font-bold text-slate-900">{user?.username}</p>
+                  <p className="text-[10px] text-slate-500 font-medium">{user?.role}</p>
+                </div>
+                <button 
+                  onClick={handleLogout}
+                  className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                  title="Logout"
+                >
+                  <X size={20} />
+                </button>
               </div>
             </div>
           </div>
@@ -795,13 +915,15 @@ export default function App() {
             >
               <div className="flex justify-between items-center">
                 <h2 className="text-2xl font-bold text-slate-900">Member Records</h2>
-                <button 
-                  onClick={() => setView('create')}
-                  className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all"
-                >
-                  <Plus size={20} />
-                  New Member
-                </button>
+                {(user?.role === 'Administrator' || user?.role === 'Data Entry') && (
+                  <button 
+                    onClick={() => setView('create')}
+                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all"
+                  >
+                    <Plus size={20} />
+                    New Member
+                  </button>
+                )}
               </div>
 
               <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
@@ -872,6 +994,9 @@ export default function App() {
                 </table>
               </div>
             </motion.div>
+          )}
+          {view === 'users' && user?.role === 'Administrator' && (
+            <UserManagement apiFetch={apiFetch} />
           )}
         </AnimatePresence>
       </main>
@@ -959,6 +1084,8 @@ export default function App() {
 // --- Helper Components ---
 
 function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record: IDRecord, assets: Assets, onClose: () => void, onPrint: (side: 'front' | 'back' | 'both') => void, onDownload: (side: 'front' | 'back' | 'both') => void }) {
+  const [activeTab, setActiveTab] = useState<'front' | 'back' | 'both'>('both');
+
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <motion.div 
@@ -974,69 +1101,95 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record
         exit={{ opacity: 0, scale: 0.9, y: 20 }}
         className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[95vh]"
       >
-        <div className="p-6 border-b border-slate-100 flex justify-between items-center bg-white sticky top-0 z-10">
+        <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white sticky top-0 z-10">
           <div>
             <h3 className="text-xl font-bold">ID Card Detailed Preview</h3>
             <p className="text-xs text-slate-500">Inspect front and back sides before printing</p>
           </div>
+          
+          <div className="flex bg-slate-100 p-1 rounded-xl">
+            <button 
+              onClick={() => setActiveTab('front')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'front' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Front
+            </button>
+            <button 
+              onClick={() => setActiveTab('back')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'back' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Back
+            </button>
+            <button 
+              onClick={() => setActiveTab('both')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'both' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Both Sides
+            </button>
+          </div>
+
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-all">
             <X size={24} />
           </button>
         </div>
         
         <div className="p-8 lg:p-12 flex-1 overflow-y-auto bg-slate-50">
-          <div className="flex flex-col lg:flex-row items-start justify-center gap-12 lg:gap-20 min-h-full">
+          <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-12 lg:gap-20 min-h-full">
             {/* Front Side */}
-            <div className="space-y-6 flex flex-col items-center w-full lg:w-auto">
-              <div className="flex items-center justify-between w-full px-2">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Front Side / የፊት ገፅ</span>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => onPrint('front')}
-                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                    title="Print Front Only"
-                  >
-                    <Printer size={14} />
-                  </button>
-                  <button 
-                    onClick={() => onDownload('front')}
-                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                    title="Download Front Only"
-                  >
-                    <Download size={14} />
-                  </button>
+            {(activeTab === 'both' || activeTab === 'front') && (
+              <div className="space-y-6 flex flex-col items-center w-full lg:w-auto">
+                <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Front Side / የፊት ገፅ</span>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => onPrint('front')}
+                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                      title="Print Front Only"
+                    >
+                      <Printer size={14} />
+                    </button>
+                    <button 
+                      onClick={() => onDownload('front')}
+                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                      title="Download Front Only"
+                    >
+                      <Download size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div id={`card-front-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
+                  <IDCardFront data={record} assets={assets} />
                 </div>
               </div>
-              <div id={`card-front-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-2xl rounded-[3.18mm]">
-                <IDCardFront data={record} assets={assets} />
-              </div>
-            </div>
+            )}
 
             {/* Back Side */}
-            <div className="space-y-6 flex flex-col items-center w-full lg:w-auto">
-              <div className="flex items-center justify-between w-full px-2">
-                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Back Side / የጀርባ ገፅ</span>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => onPrint('back')}
-                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                    title="Print Back Only"
-                  >
-                    <Printer size={14} />
-                  </button>
-                  <button 
-                    onClick={() => onDownload('back')}
-                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                    title="Download Back Only"
-                  >
-                    <Download size={14} />
-                  </button>
+            {(activeTab === 'both' || activeTab === 'back') && (
+              <div className="space-y-6 flex flex-col items-center w-full lg:w-auto">
+                <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Back Side / የጀርባ ገፅ</span>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => onPrint('back')}
+                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                      title="Print Back Only"
+                    >
+                      <Printer size={14} />
+                    </button>
+                    <button 
+                      onClick={() => onDownload('back')}
+                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                      title="Download Back Only"
+                    >
+                      <Download size={14} />
+                    </button>
+                  </div>
+                </div>
+                <div id={`card-back-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
+                  <IDCardBack data={record} assets={assets} />
                 </div>
               </div>
-              <div id={`card-back-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-2xl rounded-[3.18mm]">
-                <IDCardBack data={record} assets={assets} />
-              </div>
-            </div>
+            )}
           </div>
         </div>
 
@@ -1050,17 +1203,17 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <button 
               onClick={() => onDownload('both')}
-              className="px-6 py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold hover:bg-slate-200 transition-all flex items-center justify-center gap-2"
+              className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl"
             >
-              <Download size={20} />
-              Download Full
+              <Download size={24} />
+              Download Full (Front & Back)
             </button>
             <button 
               onClick={() => onPrint('both')}
-              className="px-10 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2"
+              className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-2xl shadow-[#2563eb4d] hover:bg-blue-700 transition-all flex items-center justify-center gap-3"
             >
-              <Printer size={20} />
-              Print Both Sides
+              <Printer size={24} />
+              Print Both Sides Together
             </button>
           </div>
         </div>
@@ -1136,9 +1289,276 @@ function FormInput({ label, value, onChange, placeholder, icon }: { label: strin
   );
 }
 
+function Login({ onLogin, loading }: { onLogin: (c: any) => void, loading: boolean }) {
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onLogin({ username, password });
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden"
+      >
+        <div className="p-10 bg-blue-600 text-white text-center">
+          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <Shield size={32} />
+          </div>
+          <h2 className="text-2xl font-bold">BGR Police Commission</h2>
+          <p className="text-blue-100 text-sm mt-1">ID Management System Login</p>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-10 space-y-6">
+          <FormInput 
+            label="Username" 
+            value={username} 
+            onChange={setUsername} 
+            placeholder="Enter username" 
+            icon={<User size={18} />} 
+          />
+          <div className="space-y-1.5">
+            <label className="text-xs font-bold text-slate-500 ml-1">Password</label>
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                <Shield size={18} />
+              </div>
+              <input 
+                type="password" 
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Enter password"
+                className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
+              />
+            </div>
+          </div>
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {loading && <Loader2 className="animate-spin" size={18} />}
+            Sign In
+          </button>
+          <p className="text-center text-[10px] text-slate-400 uppercase tracking-widest font-bold">
+            Authorized Personnel Only
+          </p>
+        </form>
+      </motion.div>
+    </div>
+  );
+}
+
+function UserManagement({ apiFetch }: { apiFetch: (u: string, o?: any) => Promise<Response> }) {
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'Viewer' });
+
+  const fetchUsers = async () => {
+    const res = await apiFetch('/api/users');
+    const data = await res.json();
+    setUsers(data);
+  };
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const handleAddUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const res = await apiFetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser)
+      });
+      if (res.ok) {
+        fetchUsers();
+        setShowAdd(false);
+        setNewUser({ username: '', password: '', role: 'Viewer' });
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to add user');
+      }
+    } catch (e) {
+      alert('Error adding user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteUser = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this user?')) return;
+    try {
+      const res = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        fetchUsers();
+      } else {
+        const data = await res.json();
+        alert(data.error || 'Failed to delete user');
+      }
+    } catch (e) {
+      alert('Error deleting user');
+    }
+  };
+
+  const handleUpdateRole = async (id: number, role: string) => {
+    try {
+      const res = await apiFetch(`/api/users/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role })
+      });
+      if (res.ok) {
+        fetchUsers();
+      }
+    } catch (e) {
+      alert('Error updating role');
+    }
+  };
+
+  return (
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-3xl font-bold">User Management</h2>
+          <p className="text-slate-500">Manage system access and roles</p>
+        </div>
+        <button 
+          onClick={() => setShowAdd(true)}
+          className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2"
+        >
+          <Plus size={20} />
+          Add New User
+        </button>
+      </div>
+
+      <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50/50">
+              <th className="px-8 py-4">Username</th>
+              <th className="px-8 py-4">Role</th>
+              <th className="px-8 py-4">Created At</th>
+              <th className="px-8 py-4 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {users.map((u) => (
+              <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                <td className="px-8 py-4 font-bold text-slate-700">{u.username}</td>
+                <td className="px-8 py-4">
+                  <select 
+                    value={u.role}
+                    onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                    className="bg-slate-100 border-none rounded-lg text-xs font-bold p-2 focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="Administrator">Administrator</option>
+                    <option value="Data Entry">Data Entry</option>
+                    <option value="Viewer">Viewer</option>
+                  </select>
+                </td>
+                <td className="px-8 py-4 text-slate-500 text-sm">
+                  {new Date(u.created_at).toLocaleDateString()}
+                </td>
+                <td className="px-8 py-4 text-right">
+                  <button 
+                    onClick={() => handleDeleteUser(u.id)}
+                    className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                  >
+                    <X size={18} />
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <AnimatePresence>
+        {showAdd && (
+          <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAdd(false)}
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden"
+            >
+              <div className="p-8 bg-blue-600 text-white flex justify-between items-center">
+                <h3 className="text-xl font-bold">Add New User</h3>
+                <button onClick={() => setShowAdd(false)} className="p-2 hover:bg-white/20 rounded-full transition-all">
+                  <X size={20} />
+                </button>
+              </div>
+              <form onSubmit={handleAddUser} className="p-8 space-y-6">
+                <FormInput 
+                  label="Username" 
+                  value={newUser.username} 
+                  onChange={(v) => setNewUser({...newUser, username: v})} 
+                  placeholder="Username" 
+                  icon={<User size={18} />} 
+                />
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 ml-1">Password</label>
+                  <div className="relative">
+                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
+                      <Shield size={18} />
+                    </div>
+                    <input 
+                      type="password" 
+                      value={newUser.password}
+                      onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                      placeholder="Password"
+                      className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-slate-500 ml-1">Role</label>
+                  <select 
+                    value={newUser.role}
+                    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all font-bold"
+                  >
+                    <option value="Administrator">Administrator</option>
+                    <option value="Data Entry">Data Entry</option>
+                    <option value="Viewer">Viewer</option>
+                  </select>
+                </div>
+                <button 
+                  type="submit" 
+                  disabled={loading}
+                  className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {loading && <Loader2 className="animate-spin" size={18} />}
+                  Create User
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 function VerificationView({ idNumber, assets }: { idNumber: string, assets: Assets }) {
   const [record, setRecord] = useState<IDRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [flipped, setFlipped] = useState(false);
 
   useEffect(() => {
     fetch(`/api/ids/${idNumber}`)
@@ -1166,9 +1586,9 @@ function VerificationView({ idNumber, assets }: { idNumber: string, assets: Asse
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 select-none pointer-events-none">
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 sm:p-12">
       <div className="mb-8 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-400 rounded-full text-sm font-bold mb-4">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#10b98133] text-emerald-400 rounded-full text-sm font-bold mb-4">
           <Check size={16} />
           Verified Official ID
         </div>
@@ -1176,11 +1596,23 @@ function VerificationView({ idNumber, assets }: { idNumber: string, assets: Asse
         <p className="text-slate-400 text-sm">Secure Verification Portal</p>
       </div>
 
-      <div className="scale-110 sm:scale-150">
-        <IDCardFront data={record} assets={assets} />
+      <div className="flex flex-col items-center gap-12">
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-[#ffffff66] text-[10px] uppercase tracking-[0.2em] font-bold">Front Side / የፊት ገፅ</p>
+          <div className="scale-110 sm:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
+            <IDCardFront data={record} assets={assets} />
+          </div>
+        </div>
+
+        <div className="flex flex-col items-center gap-4">
+          <p className="text-[#ffffff66] text-[10px] uppercase tracking-[0.2em] font-bold">Back Side / የጀርባ ገፅ</p>
+          <div className="scale-110 sm:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
+            <IDCardBack data={record} assets={assets} />
+          </div>
+        </div>
       </div>
 
-      <div className="mt-12 max-w-xs text-center">
+      <div className="mt-24 max-w-xs text-center">
         <p className="text-slate-500 text-[10px] uppercase tracking-widest font-bold">
           Security Notice: This page is for verification only. Screenshots and editing are strictly prohibited.
         </p>
