@@ -214,14 +214,23 @@ export default function App() {
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     contentRef: printRef,
+    documentTitle: "Police_ID_Card",
   });
 
   const handlePrintSide = (side: 'front' | 'back' | 'both') => {
     setPrintSide(side);
-    // Small delay to allow React to update the printRef content
+    // Use a longer delay to ensure React has rendered the changes
+    // and the print container is ready in the DOM
     setTimeout(() => {
-      handlePrint();
-    }, 100);
+      if (printRef.current) {
+        try {
+          handlePrint();
+        } catch (error) {
+          console.error("Print trigger failed:", error);
+          alert("Printing failed. This often happens if the browser blocks the print window. Please check your browser settings or try a different browser.");
+        }
+      }
+    }, 1000);
   };
 
   const [showScans, setShowScans] = useState(false);
@@ -1059,8 +1068,11 @@ export default function App() {
       </AnimatePresence>
 
       {/* Off-screen Print Content */}
-      <div className="fixed top-[-10000px] left-[-10000px] pointer-events-none">
-        <div ref={printRef} className="print-container p-[5mm] bg-white">
+      <div 
+        style={{ position: 'absolute', left: '0', top: '0', width: '100%', height: '0', overflow: 'hidden', opacity: 0, pointerEvents: 'none', zIndex: -1000 }}
+        className="no-print"
+      >
+        <div ref={printRef} key={`${selectedRecord?.id}-${printSide}`} className="print-container p-[5mm] bg-white">
           {selectedRecord && (
             <div className="flex flex-col items-center gap-8">
               {(printSide === 'both' || printSide === 'front') && (
