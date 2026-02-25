@@ -145,33 +145,44 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", vercel: isVercel });
 });
 
-app.post("/api/auth/login", (req, res) => {
-  console.log("POST /api/auth/login hit", req.body);
+app.all(["/api/auth/login", "/api/auth/login/"], (req, res) => {
+  console.log(`[LOGIN_DEBUG] Method: ${req.method}, URL: ${req.url}, Body:`, req.body);
+  
+  if (req.method === "OPTIONS") {
+    return res.status(200).end();
+  }
+
+  if (req.method !== "POST") {
+    console.log(`[LOGIN_DEBUG] Rejecting non-POST method: ${req.method}`);
+    return res.status(405).json({ error: `Method ${req.method} not allowed. Please use POST.` });
+  }
+
   const { username, password } = req.body;
   
   if (!username || !password) {
+    console.log("[LOGIN_DEBUG] Missing credentials");
     return res.status(400).json({ error: "Username and password are required" });
   }
 
-  const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username);
+  try {
+    const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username);
 
-  if (!user || !bcrypt.compareSync(password, user.password)) {
-    console.log("Login failed for:", username);
-    return res.status(401).json({ error: "Invalid username or password" });
+    if (!user || !bcrypt.compareSync(password, user.password)) {
+      console.log("[LOGIN_DEBUG] Invalid credentials for:", username);
+      return res.status(401).json({ error: "Invalid username or password" });
+    }
+
+    console.log("[LOGIN_DEBUG] Login successful for:", username);
+    const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+    return res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
+  } catch (error) {
+    console.error("[LOGIN_DEBUG] Database error:", error);
+    return res.status(500).json({ error: "Internal server error" });
   }
-
-  console.log("Login successful for:", username);
-  const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
-  res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
 });
 
-app.post("/api/auth/login/", (req, res) => {
-  console.log("POST /api/auth/login/ hit (redirecting to non-slash)");
-  res.redirect(307, "/api/auth/login");
-});
-
-app.get("/api/auth/login", (req, res) => {
-  res.json({ message: "Please use POST to login" });
+app.get("/api/auth/login-status", (req, res) => {
+  res.json({ status: "active", methods: ["POST"] });
 });
 
 // User Management (Admin only)
