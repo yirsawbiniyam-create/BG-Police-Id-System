@@ -283,7 +283,11 @@ export default function App() {
         localStorage.setItem('token', data.token);
         localStorage.setItem('user', JSON.stringify(data.user));
       } else {
-        alert(data.error || 'Login failed');
+        if (res.status === 405) {
+          alert('Server Error: Method Not Allowed (405). This usually means the API routing is not correctly configured on the server.');
+        } else {
+          alert(data.error || `Login failed (${res.status})`);
+        }
       }
     } catch (e) {
       alert('Login error');

@@ -103,11 +103,7 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const app = express();
-app.use(cors({
-  origin: true,
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  credentials: true
-}));
+app.use(cors()); // Simple CORS as suggested by user
 app.options("*", cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
@@ -142,7 +138,7 @@ const authorizeRole = (roles: string[]) => {
 // API Routes
 app.get("/api/health", (req, res) => {
   console.log("Health check hit");
-  res.json({ status: "ok", vercel: isVercel });
+  res.json({ ok: true, status: "ok", vercel: isVercel });
 });
 
 app.options("/api/auth/login", cors());
