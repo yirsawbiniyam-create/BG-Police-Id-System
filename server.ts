@@ -6,6 +6,7 @@ import fs from "fs";
 import { fileURLToPath } from "url";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import cors from "cors";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || "police-id-secret-key-2026";
@@ -102,11 +103,13 @@ process.on('unhandledRejection', (reason, promise) => {
 });
 
 const app = express();
+app.use(cors());
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
-app.use(express.json({ limit: '50mb' }));
 
 // Auth Middleware
 const authenticateToken = (req: any, res: any, next: any) => {
@@ -133,17 +136,32 @@ const authorizeRole = (roles: string[]) => {
 
 // API Routes
 app.get("/api/health", (req, res) => {
+  console.log("Health check hit");
   res.json({ status: "ok", vercel: isVercel });
 });
 
-app.post("/api/auth/login", (req, res) => {
+app.all(["/api/auth/login", "/api/auth/login/"], (req, res) => {
+  console.log(`Auth login hit: ${req.method} ${req.url}`);
+  
+  if (req.method === "GET") {
+    return res.json({ message: "Login endpoint is active. Please use POST." });
+  }
+  
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: `Method ${req.method} not allowed` });
+  }
+
   const { username, password } = req.body;
+  console.log("Login attempt for:", username);
+  
   const user = db.prepare("SELECT * FROM users WHERE username = ?").get(username);
 
   if (!user || !bcrypt.compareSync(password, user.password)) {
+    console.log("Login failed for:", username);
     return res.status(401).json({ error: "Invalid username or password" });
   }
 
+  console.log("Login successful for:", username);
   const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
   res.json({ token, user: { id: user.id, username: user.username, role: user.role } });
 });
