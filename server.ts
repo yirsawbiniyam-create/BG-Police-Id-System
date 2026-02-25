@@ -145,18 +145,11 @@ app.get("/api/health", (req, res) => {
   res.json({ status: "ok", vercel: isVercel });
 });
 
-app.all(["/api/auth/login", "/api/auth/login/"], (req, res) => {
-  console.log(`[LOGIN_DEBUG] Method: ${req.method}, URL: ${req.url}, Body:`, req.body);
+app.options("/api/auth/login", cors());
+app.options("/api/auth/login/", cors());
+app.post(["/api/auth/login", "/api/auth/login/"], (req, res) => {
+  console.log(`[LOGIN_DEBUG] POST /api/auth/login hit. Body:`, req.body);
   
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
-  }
-
-  if (req.method !== "POST") {
-    console.log(`[LOGIN_DEBUG] Rejecting non-POST method: ${req.method}`);
-    return res.status(405).json({ error: `Method ${req.method} not allowed. Please use POST.` });
-  }
-
   const { username, password } = req.body;
   
   if (!username || !password) {
@@ -179,6 +172,10 @@ app.all(["/api/auth/login", "/api/auth/login/"], (req, res) => {
     console.error("[LOGIN_DEBUG] Database error:", error);
     return res.status(500).json({ error: "Internal server error" });
   }
+});
+
+app.get("/api/auth/login", (req, res) => {
+  res.json({ message: "Please use POST to login" });
 });
 
 app.get("/api/auth/login-status", (req, res) => {
