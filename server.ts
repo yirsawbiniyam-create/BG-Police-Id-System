@@ -108,7 +108,7 @@ app.options("*", cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use((req, res, next) => {
-  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Path: ${req.path}`);
   next();
 });
 
@@ -138,7 +138,11 @@ const authorizeRole = (roles: string[]) => {
 // API Routes
 app.get("/api/health", (req, res) => {
   console.log("Health check hit");
-  res.json({ ok: true, status: "ok", vercel: isVercel });
+  res.json({ ok: true, status: "ok", vercel: isVercel, path: req.path });
+});
+
+app.get("/api/ping", (req, res) => {
+  res.send("pong");
 });
 
 app.options("/api/auth/login", cors());
