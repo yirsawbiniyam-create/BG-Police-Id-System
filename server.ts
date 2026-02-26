@@ -1,11 +1,10 @@
 import express from "express";
 import Database from "better-sqlite3";
-import path from "path";
-import fs from "fs";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import cors from "cors";
 
+/* ================= APP ================= */
 const app = express();
 
 /* ================= CONFIG ================= */
@@ -64,18 +63,30 @@ CREATE TABLE IF NOT EXISTS assets (
 );
 `);
 
-/* ================= DEFAULT ADMIN ================= */
-const adminPassword = bcrypt.hashSync("POLICE1234", 10);
-const admin = db.prepare("SELECT * FROM users WHERE username = ?").get("POLICE");
+/* ================= ROOT (FIX Cannot GET /) ================= */
+app.get("/", (req, res) => {
+  res.json({
+    name: "BG Police ID System API",
+    status: "running",
+    health: "/api/health"
+  });
+});
 
-if (!admin) {
+/* ================= DEFAULT ADMIN ================= */
+const adminExists = db
+  .prepare("SELECT 1 FROM users WHERE username = ? COLLATE NOCASE")
+  .get("POLICE");
+
+if (!adminExists) {
+  const hashed = bcrypt.hashSync("POLICE1234", 10);
   db.prepare(
     "INSERT INTO users (username, password, role) VALUES (?, ?, ?)"
-  ).run("POLICE", adminPassword, "Administrator");
+  ).run("POLICE", hashed, "Administrator");
+
   console.log("✅ Default admin created: POLICE / POLICE1234");
 }
 
-/* ================= AUTH ================= */
+/* ================= AUTH HELPERS ================= */
 const authenticateToken = (req, res, next) => {
   const auth = req.headers.authorization;
   if (!auth) return res.status(401).json({ error: "Unauthorized" });
@@ -100,9 +111,13 @@ app.get("/api/health", (req, res) => {
   res.json({ ok: true });
 });
 
-/* ================= AUTH ROUTES ================= */
+/* ================= AUTH ================= */
 app.post("/api/auth/login", (req, res) => {
   const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).json({ error: "Missing credentials" });
+  }
 
   const user = db
     .prepare("SELECT * FROM users WHERE username = ? COLLATE NOCASE")
@@ -120,7 +135,11 @@ app.post("/api/auth/login", (req, res) => {
 
   res.json({
     token,
-    user: { id: user.id, username: user.username, role: user.role },
+    user: {
+      id: user.id,
+      username: user.username,
+      role: user.role
+    }
   });
 });
 
@@ -139,16 +158,14 @@ app.post(
     const nextId = (last?.id || 0) + 1;
     const id_number = `BGR-POL-${String(nextId).padStart(5, "0")}`;
 
-    const stmt = db.prepare(`
+    db.prepare(`
       INSERT INTO ids (
         id_number, full_name_am, full_name_en,
         rank_am, rank_en,
         responsibility_am, responsibility_en,
         phone, photo_url, commissioner_signature
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
+    `).run(
       id_number,
       req.body.full_name_am,
       req.body.full_name_en,
@@ -201,9 +218,11 @@ app.post(
     if (!key || !value) {
       return res.status(400).json({ error: "Missing key or value" });
     }
+
     db.prepare(
       "INSERT OR REPLACE INTO assets (key, value) VALUES (?, ?)"
     ).run(key, value);
+
     res.json({ success: true });
   }
 );
@@ -215,5 +234,5 @@ app.use("/api/*", (req, res) => {
 
 /* ================= START ================= */
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 Backend running on port ${PORT}`);
+  console.log(`🚀 Backend running on http://localhost:${PORT}`);
 });
