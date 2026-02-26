@@ -25,6 +25,13 @@ interface IDRecord {
   responsibility_en: string;
   phone: string;
   photo_url: string;
+  blood_type: string;
+  badge_number: string;
+  gender: string;
+  complexion: string;
+  height: string;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
   commissioner_signature: string;
   created_at: string;
 }
@@ -47,80 +54,92 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
   return (
     <div 
       ref={ref}
-      className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] overflow-hidden flex flex-col p-2 border border-[#d977064d] select-none"
+      className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] overflow-hidden flex flex-col p-[3mm] select-none box-border"
       style={{ 
         printColorAdjust: 'exact',
-        background: 'linear-gradient(135deg, #fbbf24 0%, #fef3c7 50%, #2563eb 100%)'
+        background: 'linear-gradient(135deg, #fbbf24 0%, #fef3c7 50%, #2563eb 100%)',
+        border: '0.1mm solid rgba(217, 119, 6, 0.3)'
       }}
     >
       {/* Header */}
-      <div className="flex justify-between items-center h-16 px-1">
-        <img src={assets.bgr_flag || "https://picsum.photos/seed/bgr/100/60"} className="h-10 w-16 object-cover rounded-sm shadow-sm" alt="BGR Flag" />
-        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center overflow-hidden shadow-sm border border-[#1e3a8a1a] -mt-4">
+      <div className="flex justify-between items-center h-12 px-1">
+        <img src={assets.bgr_flag || "https://picsum.photos/seed/bgr/100/60"} className="h-7 w-11 object-cover rounded-sm shadow-sm" alt="BGR Flag" />
+        <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
           <img 
             src={assets.police_logo || "https://picsum.photos/seed/logo/120/120"} 
-            className="w-18 h-18 object-contain" 
+            className="w-12 h-12 object-contain mix-blend-multiply" 
             alt="Police Logo" 
           />
         </div>
-        <img src={assets.eth_flag || "https://picsum.photos/seed/eth/100/60"} className="h-10 w-16 object-cover rounded-sm shadow-sm" alt="ETH Flag" />
+        <img src={assets.eth_flag || "https://picsum.photos/seed/eth/100/60"} className="h-7 w-11 object-cover rounded-sm shadow-sm" alt="ETH Flag" />
       </div>
 
       {/* Commission Name */}
-      <div className="text-center -mt-1">
-        <h1 className="text-[8px] font-bold text-blue-900 leading-tight">የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
-        <h2 className="text-[7px] font-semibold text-blue-800 uppercase tracking-tighter">Benishangul-Gumuz Region Police Commission</h2>
-        <div className="mt-0.5 border-t border-[#1e3a8a33] pt-0.5">
-          <p className="text-[8px] font-black text-red-600 tracking-widest leading-none">የመታወቂያ ካርድ</p>
-          <p className="text-[6px] font-bold text-blue-900 uppercase tracking-widest">IDENTITY CARD</p>
+      <div className="text-center mt-0.5">
+        <h1 className="text-[7.5px] font-bold text-blue-900 leading-tight">የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
+        <h2 className="text-[6.5px] font-semibold text-blue-800 uppercase tracking-tighter">Benishangul-Gumuz Region Police Commission</h2>
+        <div className="mt-0 border-t border-[#1e3a8a33] pt-0.5">
+          <p className="text-[7.5px] font-black text-red-600 tracking-widest leading-none">የመታወቂያ ካርድ</p>
+          <p className="text-[5.5px] font-bold text-blue-900 uppercase tracking-widest">IDENTITY CARD</p>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex flex-1 mt-1 gap-2">
+      <div className="flex flex-1 mt-0.5 gap-2 overflow-hidden">
         {/* Left Side: Details */}
-        <div className="flex-1 flex flex-col justify-center space-y-0.5 pl-1">
+        <div className="flex-1 flex flex-col justify-center space-y-0 pl-1">
           <div className="flex flex-col">
-            <span className="text-[5px] text-[#1e3a8ab3] font-bold">ID NO / መታወቂያ ቁጥር</span>
-            <span className="text-[8px] font-black text-blue-900">{data.id_number || "BGR-POL-00000"}</span>
+            <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">ID NO / መታወቂያ ቁጥር</span>
+            <span className="text-[7.5px] font-black text-blue-900 leading-tight">{data.id_number || "BGR-POL-00000"}</span>
           </div>
           
           <div className="flex flex-col">
-            <span className="text-[5px] text-[#1e3a8ab3] font-bold">FULL NAME / ሙሉ ስም</span>
-            <span className="text-[7px] font-bold text-gray-900 leading-none">{data.full_name_am}</span>
-            <span className="text-[6px] font-medium text-gray-800 uppercase">{data.full_name_en}</span>
+            <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">FULL NAME / ሙሉ ስም</span>
+            <span className="text-[7px] font-bold text-gray-900 leading-tight">{data.full_name_am}</span>
+            <span className="text-[6px] font-medium text-gray-800 uppercase leading-tight">{data.full_name_en}</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-1">
+          <div className="grid grid-cols-2 gap-x-1">
             <div className="flex flex-col">
-              <span className="text-[5px] text-[#1e3a8ab3] font-bold">RANK / ማዕረግ</span>
-              <span className="text-[6px] font-bold text-gray-900">{data.rank_am} / {data.rank_en}</span>
+              <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">RANK / ማዕረግ</span>
+              <span className="text-[6px] font-bold text-gray-900 leading-tight">{data.rank_am} / {data.rank_en}</span>
             </div>
             <div className="flex flex-col">
-              <span className="text-[5px] text-[#1e3a8ab3] font-bold">PHONE / ስልክ</span>
-              <span className="text-[6px] font-bold text-gray-900">{data.phone}</span>
+              <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">PHONE / ስልክ</span>
+              <span className="text-[6px] font-bold text-gray-900 leading-tight">{data.phone}</span>
             </div>
           </div>
 
           <div className="flex flex-col">
-            <span className="text-[5px] text-[#1e3a8ab3] font-bold">RESPONSIBILITY / ሀላፊነት</span>
-            <span className="text-[6px] font-bold text-gray-900">{data.responsibility_am} / {data.responsibility_en}</span>
+            <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">RESPONSIBILITY / ሀላፊነት</span>
+            <span className="text-[6px] font-bold text-gray-900 leading-tight">{data.responsibility_am} / {data.responsibility_en}</span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-x-1">
+            <div className="flex flex-col">
+              <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">BLOOD TYPE / የደም አይነት</span>
+              <span className="text-[6px] font-bold text-red-600 leading-tight">{data.blood_type || "N/A"}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">የጡረታ መለያ ቁጥር</span>
+              <span className="text-[6px] font-bold text-gray-900 leading-tight">{data.badge_number || "N/A"}</span>
+            </div>
           </div>
         </div>
 
         {/* Right Side: Photo & Barcode */}
         <div className="w-20 flex flex-col items-center justify-center pr-1">
-          <div className="w-16 h-20 bg-white border-2 border-amber-500 rounded-md overflow-hidden shadow-inner">
+          <div className="w-18 h-24 bg-white border border-amber-500 rounded-md overflow-hidden shadow-inner">
             {data.photo_url ? (
               <img src={data.photo_url} className="w-full h-full object-cover" alt="Member" />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-[#d977064d]">
-                <User size={32} />
+                <User size={28} />
               </div>
             )}
           </div>
-          <div className="mt-1 scale-[0.4] origin-top">
-            <Barcode value={data.id_number || "BGR-POL-00000"} height={30} width={1.5} fontSize={0} margin={0} />
+          <div className="mt-0.5 scale-[0.3] origin-top">
+            <Barcode value={data.id_number || "BGR-POL-00000"} height={22} width={1.1} fontSize={0} margin={0} />
           </div>
         </div>
       </div>
@@ -135,10 +154,11 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
   return (
     <div 
       ref={ref}
-      className="relative w-[85.6mm] h-[53.98mm] rounded-xl overflow-hidden flex flex-col p-4 border border-gray-200 select-none"
+      className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] overflow-hidden flex flex-col p-[4mm] select-none box-border"
       style={{ 
         printColorAdjust: 'exact',
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        border: '0.1mm solid rgba(0, 0, 0, 0.1)'
       }}
     >
       {/* Watermark */}
@@ -146,36 +166,66 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
         <img src={assets.police_logo || "https://picsum.photos/seed/logo/200/200"} className="w-48 h-48 object-contain" alt="Watermark" />
       </div>
 
-      <div className="relative z-10 flex h-full gap-6 items-center">
+      <div className="relative z-10 flex h-full gap-4 items-center">
         {/* Left: Large QR Code Section */}
-        <div className="flex flex-col items-center justify-center space-y-2">
-          <span className="text-[7px] font-bold text-blue-900 uppercase tracking-wider">VERIFICATION / ማረጋገጫ</span>
-          <div className="p-2 bg-white border-2 border-slate-100 rounded-lg shadow-sm">
+        <div className="flex flex-col items-center justify-center space-y-1">
+          <span className="text-[6px] font-bold text-blue-900 uppercase tracking-wider">VERIFICATION / ማረጋገጫ</span>
+          <div className="p-1.5 bg-white border border-slate-100 rounded-lg shadow-sm">
             <QRCodeSVG 
               value={`${window.location.origin}/verify/${data.id_number}`} 
-              size={110} 
+              size={100} 
             />
+          </div>
+          <div className="flex flex-col items-center mt-1">
+            <span className="text-[5px] font-bold text-gray-400 uppercase">ID NO / መታወቂያ ቁጥር</span>
+            <span className="text-[7px] font-black text-blue-900">{data.id_number}</span>
+          </div>
+        </div>
+
+        {/* Middle: Personal Details */}
+        <div className="flex-1 flex flex-col justify-center space-y-1 border-l border-slate-100 pl-4">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+            <div className="flex flex-col">
+              <span className="text-[5px] text-slate-400 font-bold uppercase">GENDER / ፆታ</span>
+              <span className="text-[7px] font-bold text-slate-800">{data.gender || "N/A"}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[5px] text-slate-400 font-bold uppercase">HEIGHT / ቁመት</span>
+              <span className="text-[7px] font-bold text-slate-800">{data.height || "N/A"}</span>
+            </div>
+            <div className="flex flex-col">
+              <span className="text-[5px] text-slate-400 font-bold uppercase">COMPLEXION / መልክ</span>
+              <span className="text-[7px] font-bold text-slate-800">{data.complexion || "N/A"}</span>
+            </div>
+          </div>
+          
+          <div className="pt-1 border-t border-slate-50 mt-1">
+            <span className="text-[5px] text-slate-400 font-bold uppercase">የአደጋ ጊዜ ተጠሪ</span>
+            <div className="flex flex-col">
+              <span className="text-[7px] font-bold text-slate-800">{data.emergency_contact_name || "N/A"}</span>
+              <span className="text-[7px] font-bold text-blue-700">{data.emergency_contact_phone || "N/A"}</span>
+            </div>
           </div>
         </div>
 
         {/* Right: Text and Signature */}
-        <div className="flex-1 flex flex-col justify-between h-full py-2">
-          <div className="space-y-3">
-            <p className="text-[9px] font-bold text-gray-800 leading-tight">
-              ይህንን መታወቂያ የያዘ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን የፖሊስ አባል ነዉ፤ ህግን የማስከበር ስልጣን ተሰጥቶታል፡፡ ህግን ሲያስከብር መታወቂያዉን የማሳየት ግዴታ አለበት፡፡
+        <div className="w-32 flex flex-col justify-between h-full py-1">
+          <div className="space-y-1.5">
+            <p className="text-[7px] font-bold text-gray-800 leading-tight">
+              ይህንን መታወቂያ የያዘ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን የፖሊስ አባል ነዉ፤ ህግን የማስከበር ስልጣን ተሰጥቶታል፡፡
             </p>
-            <p className="text-[8px] font-medium text-gray-600 italic leading-tight">
-              This ID holder is a member of the Benishangul-Gumuz Region Police Commission; authorized to enforce the law. Must show ID when enforcing the law.
+            <p className="text-[6px] font-medium text-gray-600 italic leading-tight">
+              This ID holder is a member of the BGR Police Commission; authorized to enforce the law.
             </p>
           </div>
           
-          <div className="flex flex-col items-center self-end mt-4">
+          <div className="flex flex-col items-center mt-2">
             {data.commissioner_signature ? (
-              <img src={data.commissioner_signature} className="h-10 w-32 object-contain mix-blend-multiply" alt="Signature" />
+              <img src={data.commissioner_signature} className="h-8 w-24 object-contain mix-blend-multiply" alt="Signature" />
             ) : (
-              <div className="h-10 w-32 border-b border-gray-400 mb-1"></div>
+              <div className="h-8 w-24 border-b border-gray-400 mb-1"></div>
             )}
-            <span className="text-[7px] font-bold text-gray-500 uppercase">COMMISSIONER SIGNATURE / የኮሚሽነሩ ፊርማ</span>
+            <span className="text-[5px] font-bold text-gray-500 uppercase text-center">COMMISSIONER SIGNATURE / የኮሚሽነሩ ፊርማ</span>
           </div>
         </div>
       </div>
@@ -207,6 +257,13 @@ export default function App() {
     responsibility_en: '',
     phone: '',
     photo_url: '',
+    blood_type: '',
+    badge_number: '',
+    gender: '',
+    complexion: '',
+    height: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
     commissioner_signature: ''
   });
 
@@ -246,6 +303,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    console.log("Current Auth State:", { hasToken: !!token, user: user?.username });
     if (token) {
       fetchAssets();
       fetchRecords();
@@ -269,6 +327,7 @@ export default function App() {
   };
 
   const handleLogin = async (credentials: any) => {
+    console.log("Attempting login with:", credentials.username);
     setLoading(true);
     try {
       const res = await fetch('/api/auth/login', {
@@ -296,7 +355,9 @@ export default function App() {
         if (res.status === 405) {
           alert('Server Error: Method Not Allowed (405). The API endpoint exists but does not support POST requests. Please check Vercel routing.');
         } else {
-          alert(data.error || `Login failed (${res.status})`);
+          const errorMsg = data.error || `Login failed (${res.status})`;
+          const details = data.details ? `\n\nDetails: ${data.details}` : '';
+          alert(`${errorMsg}${details}`);
         }
       }
     } catch (e) {
@@ -613,6 +674,9 @@ export default function App() {
           rank_am: '', rank_en: '',
           responsibility_am: '', responsibility_en: '',
           phone: '', photo_url: '',
+          blood_type: '', badge_number: '',
+          gender: '', complexion: '', height: '',
+          emergency_contact_name: '', emergency_contact_phone: '',
           commissioner_signature: ''
         });
         setView('history');
@@ -771,6 +835,27 @@ export default function App() {
                         <FormInput label="Responsibility (English)" value={formData.responsibility_en} onChange={(v) => setFormData({...formData, responsibility_en: v})} placeholder="Responsibility" icon={<Briefcase size={18}/>} />
                       </div>
                       <FormInput label="Phone Number" value={formData.phone} onChange={(v) => setFormData({...formData, phone: v})} placeholder="+251..." icon={<Phone size={18}/>} />
+                      
+                      <div className="pt-4 border-t border-slate-100">
+                        <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-4">Front Side Details</h4>
+                        <div className="grid grid-cols-2 gap-4">
+                          <FormInput label="Blood Type" value={formData.blood_type} onChange={(v) => setFormData({...formData, blood_type: v})} placeholder="A+, B-, etc." icon={<Check size={18}/>} />
+                          <FormInput label="Badge Number" value={formData.badge_number} onChange={(v) => setFormData({...formData, badge_number: v})} placeholder="Badge #" icon={<Shield size={18}/>} />
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-slate-100">
+                        <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-4">Back Side Details</h4>
+                        <div className="grid grid-cols-3 gap-4">
+                          <FormInput label="Gender" value={formData.gender} onChange={(v) => setFormData({...formData, gender: v})} placeholder="M/F" icon={<User size={18}/>} />
+                          <FormInput label="Complexion" value={formData.complexion} onChange={(v) => setFormData({...formData, complexion: v})} placeholder="Brown, etc." icon={<Eye size={18}/>} />
+                          <FormInput label="Height" value={formData.height} onChange={(v) => setFormData({...formData, height: v})} placeholder="1.75m" icon={<Plus size={18}/>} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                          <FormInput label="Emergency Contact Name" value={formData.emergency_contact_name} onChange={(v) => setFormData({...formData, emergency_contact_name: v})} placeholder="Name" icon={<User size={18}/>} />
+                          <FormInput label="Emergency Contact Phone" value={formData.emergency_contact_phone} onChange={(v) => setFormData({...formData, emergency_contact_phone: v})} placeholder="Phone" icon={<Phone size={18}/>} />
+                        </div>
+                      </div>
                     </div>
 
                     <div className="flex flex-col gap-6">
@@ -1087,7 +1172,7 @@ export default function App() {
         style={{ position: 'absolute', left: '0', top: '0', width: '100%', height: '0', overflow: 'hidden', opacity: 0, pointerEvents: 'none', zIndex: -1000 }}
         className="no-print"
       >
-        <div ref={printRef} key={`${selectedRecord?.id}-${printSide}`} className="print-container p-[5mm] bg-white">
+        <div ref={printRef} key={`${selectedRecord?.id}-${printSide}`} className="print-container bg-white">
           {selectedRecord && (
             <div className="flex flex-col items-center gap-8">
               {(printSide === 'both' || printSide === 'front') && (
@@ -1371,10 +1456,27 @@ function Login({ onLogin, loading }: { onLogin: (c: any) => void, loading: boole
             {loading && <Loader2 className="animate-spin" size={18} />}
             Sign In
           </button>
-          <div className="text-center space-y-1">
+          <div className="text-center space-y-2">
             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
               DEFAULT: POLICE / POLICE1234
             </p>
+            <button 
+              type="button"
+              onClick={async () => {
+                if(confirm("Reset admin user to default?")) {
+                  try {
+                    const res = await fetch('/api/auth/reset-admin', { method: 'POST' });
+                    const data = await res.json();
+                    alert(data.message || "Reset successful");
+                  } catch (e) {
+                    alert("Reset failed");
+                  }
+                }
+              }}
+              className="text-[10px] text-blue-400 hover:text-blue-600 font-bold uppercase tracking-widest"
+            >
+              Reset Admin Account
+            </button>
           </div>
         </form>
       </motion.div>
@@ -1615,35 +1717,30 @@ function VerificationView({ idNumber, assets }: { idNumber: string, assets: Asse
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 sm:p-12">
+    <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 sm:p-12 select-none">
       <div className="mb-8 text-center">
         <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#10b98133] text-emerald-400 rounded-full text-sm font-bold mb-4">
           <Check size={16} />
-          Verified Official ID
+          Verified Official ID / ህጋዊ መታወቂያ
         </div>
         <h1 className="text-white text-xl font-bold">BGR Police Commission</h1>
-        <p className="text-slate-400 text-sm">Secure Verification Portal</p>
+        <p className="text-slate-400 text-sm">Secure Verification Portal / ደህንነቱ የተጠበቀ ማረጋገጫ</p>
       </div>
 
       <div className="flex flex-col items-center gap-12">
         <div className="flex flex-col items-center gap-4">
-          <p className="text-[#ffffff66] text-[10px] uppercase tracking-[0.2em] font-bold">Front Side / የፊት ገፅ</p>
-          <div className="scale-110 sm:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
+          <div className="scale-110 sm:scale-150 lg:scale-[2.0] origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm]">
             <IDCardFront data={record} assets={assets} />
-          </div>
-        </div>
-
-        <div className="flex flex-col items-center gap-4">
-          <p className="text-[#ffffff66] text-[10px] uppercase tracking-[0.2em] font-bold">Back Side / የጀርባ ገፅ</p>
-          <div className="scale-110 sm:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
-            <IDCardBack data={record} assets={assets} />
           </div>
         </div>
       </div>
 
-      <div className="mt-24 max-w-xs text-center">
+      <div className="mt-32 max-w-sm text-center">
         <p className="text-slate-500 text-[10px] uppercase tracking-widest font-bold">
-          Security Notice: This page is for verification only. Screenshots and editing are strictly prohibited.
+          Security Notice: This page is for verification only. Any attempt to alter this data is a crime.
+        </p>
+        <p className="text-slate-600 text-[9px] mt-2">
+          ማሳሰቢያ፡ ይህ ገፅ ለመታወቂያ ማረጋገጫ ብቻ የሚያገለግል ነዉ። መረጃውን ለመለወጥ መሞከር በህግ ያስቀጣል።
         </p>
       </div>
     </div>

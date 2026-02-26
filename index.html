@@ -3,20 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
-    <meta
-      http-equiv="Content-Security-Policy"
-      content="
-        default-src 'self';
-        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://vercel.live https://*.vercel.live;
-        style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
-        img-src 'self' data: https:;
-        font-src 'self' data: https: https://fonts.gstatic.com;
-        connect-src 'self' http://localhost:3000 http://127.0.0.1:3000 https: https://*.vercel.live;
-        frame-src 'self' https://vercel.live https://*.vercel.live;
-      "
-    />
-
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-src 'self' https:;">
     <title>BGR Police ID System</title>
   </head>
   <body>
@@ -24,3 +11,4 @@
     <script type="module" src="src/main.tsx"></script>
   </body>
 </html>
+
