@@ -296,9 +296,15 @@ export default function App() {
   useEffect(() => {
     const savedToken = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
-    if (savedToken && savedUser) {
-      setToken(savedToken);
-      setUser(JSON.parse(savedUser));
+    if (savedToken && savedUser && savedUser !== "undefined") {
+      try {
+        setToken(savedToken);
+        setUser(JSON.parse(savedUser));
+      } catch (e) {
+        console.error("Failed to parse saved user:", e);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
     }
   }, []);
 
@@ -350,7 +356,9 @@ export default function App() {
         setToken(data.token);
         setUser(data.user);
         localStorage.setItem('token', data.token);
-        localStorage.setItem('user', JSON.stringify(data.user));
+        if (data.user) {
+          localStorage.setItem('user', JSON.stringify(data.user));
+        }
       } else {
         if (res.status === 405) {
           alert('Server Error: Method Not Allowed (405). The API endpoint exists but does not support POST requests. Please check Vercel routing.');
@@ -1693,9 +1701,22 @@ function VerificationView({ idNumber, assets }: { idNumber: string, assets: Asse
 
   useEffect(() => {
     fetch(`/api/ids/${idNumber}`)
-      .then(res => res.json())
+      .then(async res => {
+        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+        const contentType = res.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+          return res.json();
+        } else {
+          throw new Error("Server returned non-JSON response");
+        }
+      })
       .then(data => {
         setRecord(data);
+        setLoading(false);
+      })
+      .catch(err => {
+        console.error("Verification fetch error:", err);
+        setRecord(null);
         setLoading(false);
       });
   }, [idNumber]);
