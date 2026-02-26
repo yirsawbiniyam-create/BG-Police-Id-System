@@ -248,11 +248,16 @@ app.post("/api/auth/reset-admin", async (req, res) => {
   }
 });
 
+app.get("/api/test", (req, res) => {
+  res.json({ message: "API is working", timestamp: new Date().toISOString() });
+});
+
 app.post(["/api/auth/login", "/api/auth/login/"], async (req, res) => {
-  console.log(`[LOGIN_DEBUG] POST /api/auth/login hit. Body:`, req.body);
+  console.log(`[LOGIN_DEBUG] POST /api/auth/login hit. Body:`, JSON.stringify(req.body));
   
   const currentDb = await initDb();
   if (!currentDb) {
+    console.error("[LOGIN_DEBUG] DB not initialized");
     return res.status(500).json({ 
       error: "Database not available", 
       details: dbError?.message || "Unknown database error" 
@@ -564,6 +569,21 @@ async function startServer() {
   console.log("Entering startServer...");
   const PORT = Number(process.env.PORT) || 3000;
 
+  // API routes FIRST
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", message: "Server is healthy" });
+  });
+
+  // Catch-all for missing API routes
+  app.all("/api/*", (req, res) => {
+    console.log(`[404_API_DEBUG] ${req.method} ${req.url} - Not Found`);
+    res.status(404).json({ 
+      error: "API Route Not Found", 
+      method: req.method, 
+      path: req.url 
+    });
+  });
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
@@ -590,8 +610,15 @@ async function startServer() {
   });
 }
 
-if (!isVercel) {
-  startServer();
-}
+console.log("Environment check:", {
+  NODE_ENV: process.env.NODE_ENV,
+  VERCEL: process.env.VERCEL,
+  PORT: process.env.PORT,
+  isVercel
+});
+
+startServer().catch(err => {
+  console.error("Failed to start server:", err);
+});
 
 export default app;

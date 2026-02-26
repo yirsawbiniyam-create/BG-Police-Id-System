@@ -360,8 +360,10 @@ export default function App() {
           localStorage.setItem('user', JSON.stringify(data.user));
         }
       } else {
-        if (res.status === 405) {
-          alert('Server Error: Method Not Allowed (405). The API endpoint exists but does not support POST requests. Please check Vercel routing.');
+        if (res.status === 404) {
+          alert('Server Error: Login API not found (404). The server might be restarting or the route is misconfigured.');
+        } else if (res.status === 405) {
+          alert('Server Error: Method Not Allowed (405).');
         } else {
           const errorMsg = data.error || `Login failed (${res.status})`;
           const details = data.details ? `\n\nDetails: ${data.details}` : '';
