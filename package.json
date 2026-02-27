@@ -1,23 +1,17 @@
 {
-  "name": "react-example",
-  "private": true,
-  "version": "0.0.0",
+  "name": "bg-police-id-api",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsx server.ts",
-    "build": "vite build",
-    "start": "tsx server.ts",
-    "lint": "tsc --noEmit"
+    "start": "node server.js"
   },
   "dependencies": {
-    "@google/genai": "^1.29.0",
-    "@tailwindcss/vite": "^4.1.14",
-    "@vitejs/plugin-react": "^5.0.4",
-    "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.6.2",
-    "clsx": "^2.1.1",
+    "express": "^4.21.2",
     "cors": "^2.8.6",
-    "dotenv": "^17.2.3",
+    "better-sqlite3": "^12.6.2",
+    "bcryptjs": "^3.0.3",
+    "jsonwebtoken": "^9.0.3",
+    "dotenv": "^17.2.3"
     "express": "^4.21.2",
     "html2canvas": "^1.4.1",
     "jsonwebtoken": "^9.0.3",
