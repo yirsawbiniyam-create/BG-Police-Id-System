@@ -252,7 +252,7 @@ app.get("/api/test", (req, res) => {
   res.json({ message: "API is working", timestamp: new Date().toISOString() });
 });
 
-app.post(["/api/auth/login", "/api/auth/login/"], async (req, res) => {
+app.post("/api/auth/login", async (req, res) => {
   console.log(`[LOGIN_DEBUG] POST /api/auth/login hit. Body:`, JSON.stringify(req.body));
   
   const currentDb = await initDb();
@@ -571,7 +571,12 @@ async function startServer() {
 
   // API routes FIRST
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", message: "Server is healthy" });
+    res.json({ status: "ok", message: "Server is healthy", timestamp: new Date().toISOString() });
+  });
+
+  // Test route
+  app.get("/api/test-api", (req, res) => {
+    res.json({ message: "API is reachable" });
   });
 
   // Catch-all for missing API routes

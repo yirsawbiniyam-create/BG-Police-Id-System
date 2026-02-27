@@ -86,7 +86,7 @@
 
 @media print {
   @page {
-    size: auto;
+    size: 85.6mm 53.98mm;
     margin: 0mm;
   }
   body {
@@ -100,18 +100,18 @@
     display: none !important;
   }
   .print-container {
-    display: flex !important;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    width: 100%;
-    padding: 10mm 0;
+    display: block !important;
+    width: 85.6mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
   }
   .print-card {
     width: 85.6mm !important;
     height: 53.98mm !important;
+    page-break-after: always;
     page-break-inside: avoid;
-    margin-bottom: 10mm;
+    margin: 0 !important;
+    padding: 0 !important;
     border: none !important;
     box-shadow: none !important;
     overflow: hidden;
@@ -124,6 +124,7 @@
   .print-card * {
     text-rendering: optimizeLegibility;
     -webkit-font-smoothing: antialiased;
+    font-variant-ligatures: none;
   }
 }
 

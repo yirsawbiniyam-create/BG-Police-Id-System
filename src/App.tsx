@@ -4,7 +4,8 @@ import {
   Plus, History, Search, Printer, Download, 
   Shield, User, Phone, Briefcase, Award, 
   ChevronRight, Languages, Loader2, Camera,
-  Eye, X, Check, Database as DbIcon, RefreshCw, HardDrive
+  Eye, X, Check, Database as DbIcon, RefreshCw, HardDrive,
+  ShieldAlert
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -54,98 +55,98 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
   return (
     <div 
       ref={ref}
-      className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] overflow-hidden flex flex-col p-[3mm] select-none box-border"
+      className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] overflow-hidden flex flex-col p-[1.5mm] select-none box-border"
       style={{ 
         printColorAdjust: 'exact',
-        background: 'linear-gradient(135deg, #fbbf24 0%, #fef3c7 50%, #2563eb 100%)',
-        border: '0.1mm solid rgba(217, 119, 6, 0.3)'
+        background: 'linear-gradient(135deg, #fcd34d 0%, #fffbeb 40%, #ffffff 60%, #dbeafe 100%)',
+        border: '0.2mm solid rgba(30, 58, 138, 0.1)'
       }}
     >
+      {/* Background Pattern / Security Element */}
+      <div className="absolute inset-0 opacity-[0.03] pointer-events-none flex items-center justify-center">
+        <Shield size={200} style={{ color: '#1e3a8a' }} />
+      </div>
+
       {/* Header */}
-      <div className="flex justify-between items-center h-12 px-1">
-        <img src={assets.bgr_flag || "https://picsum.photos/seed/bgr/100/60"} className="h-7 w-11 object-cover rounded-sm shadow-sm" alt="BGR Flag" />
-        <div className="w-12 h-12 flex items-center justify-center overflow-hidden">
-          <img 
-            src={assets.police_logo || "https://picsum.photos/seed/logo/120/120"} 
-            className="w-12 h-12 object-contain mix-blend-multiply" 
-            alt="Police Logo" 
-          />
+      <div className="relative z-10 flex justify-between items-start h-12 px-2 pt-1">
+        <img src={assets.bgr_flag || "https://picsum.photos/seed/bgr/100/60"} className="h-7 w-13 object-cover rounded-sm shadow-sm" alt="BGR Flag" />
+        <div className="flex flex-col items-center -mt-1">
+          <div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center">
+            <img 
+              src={assets.police_logo || "https://picsum.photos/seed/logo/120/120"} 
+              className="w-full h-full object-contain mix-blend-multiply" 
+              alt="Police Logo" 
+            />
+          </div>
         </div>
-        <img src={assets.eth_flag || "https://picsum.photos/seed/eth/100/60"} className="h-7 w-11 object-cover rounded-sm shadow-sm" alt="ETH Flag" />
+        <img src={assets.eth_flag || "https://picsum.photos/seed/eth/100/60"} className="h-7 w-13 object-cover rounded-sm shadow-sm" alt="ETH Flag" />
       </div>
 
       {/* Commission Name */}
-      <div className="text-center mt-0.5">
-        <h1 className="text-[7.5px] font-bold text-blue-900 leading-tight">የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
-        <h2 className="text-[6.5px] font-semibold text-blue-800 uppercase tracking-tighter">Benishangul-Gumuz Region Police Commission</h2>
-        <div className="mt-0 border-t border-[#1e3a8a33] pt-0.5">
-          <p className="text-[7.5px] font-black text-red-600 tracking-widest leading-none">የመታወቂያ ካርድ</p>
-          <p className="text-[5.5px] font-bold text-blue-900 uppercase tracking-widest">IDENTITY CARD</p>
+      <div className="relative z-10 text-center mb-0.5 mt-1">
+        <h1 className="text-[8px] font-extrabold leading-none tracking-tight" style={{ color: '#1e3a8a' }}>የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
+        <h2 className="text-[6px] font-bold uppercase tracking-tighter leading-none mt-0.5" style={{ color: '#1e40af' }}>Benishangul-Gumuz Region Police Commission</h2>
+        <div className="mt-0.5 border-t pt-0.5 flex justify-center gap-3" style={{ borderTopColor: 'rgba(30, 58, 138, 0.2)' }}>
+          <p className="text-[8px] font-black tracking-widest leading-none" style={{ color: '#dc2626' }}>የመታወቂያ ካርድ</p>
+          <p className="text-[6px] font-bold uppercase tracking-widest leading-none self-center" style={{ color: '#1e3a8a' }}>IDENTITY CARD</p>
         </div>
       </div>
 
-      {/* Main Content */}
-      <div className="flex flex-1 mt-0.5 gap-2 overflow-hidden">
-        {/* Left Side: Details */}
-        <div className="flex-1 flex flex-col justify-center space-y-0 pl-1">
-          <div className="flex flex-col">
-            <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">ID NO / መታወቂያ ቁጥር</span>
-            <span className="text-[7.5px] font-black text-blue-900 leading-tight">{data.id_number || "BGR-POL-00000"}</span>
-          </div>
-          
-          <div className="flex flex-col">
-            <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">FULL NAME / ሙሉ ስም</span>
-            <span className="text-[7px] font-bold text-gray-900 leading-tight">{data.full_name_am}</span>
-            <span className="text-[6px] font-medium text-gray-800 uppercase leading-tight">{data.full_name_en}</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-x-1">
-            <div className="flex flex-col">
-              <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">RANK / ማዕረግ</span>
-              <span className="text-[6px] font-bold text-gray-900 leading-tight">{data.rank_am} / {data.rank_en}</span>
+      {/* Main Content Area */}
+      <div className="relative z-10 flex flex-1 gap-1.5 px-1 overflow-hidden">
+        {/* Left Column: Details */}
+        <div className="w-[55mm] flex flex-col justify-center py-0.5">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 px-2 py-0.5 rounded-md border shadow-sm" style={{ backgroundColor: '#1e3a8a', borderColor: '#1e3a8a' }}>
+              <span className="text-[4.5px] font-bold uppercase whitespace-nowrap" style={{ color: 'rgba(255, 255, 255, 0.8)' }}>ID NO / መታወቂያ ቁጥር:</span>
+              <span className="text-[9px] font-black text-white tracking-wider">{data.id_number || "BGR-POL-00000"}</span>
             </div>
-            <div className="flex flex-col">
-              <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">PHONE / ስልክ</span>
-              <span className="text-[6px] font-bold text-gray-900 leading-tight">{data.phone}</span>
+            
+            <div className="p-1 rounded-md border-l-2" style={{ backgroundColor: 'rgba(219, 234, 254, 0.5)', borderLeftColor: '#2563eb' }}>
+              <div className="text-[4.5px] font-bold uppercase" style={{ color: 'rgba(30, 58, 138, 0.6)' }}>FULL NAME / ሙሉ ስም</div>
+              <div className="text-[9px] font-bold leading-tight truncate" style={{ color: '#0f172a' }}>{data.full_name_am}</div>
+              <div className="text-[7.5px] font-semibold uppercase leading-tight truncate" style={{ color: '#334155' }}>{data.full_name_en}</div>
             </div>
-          </div>
 
-          <div className="flex flex-col">
-            <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">RESPONSIBILITY / ሀላፊነት</span>
-            <span className="text-[6px] font-bold text-gray-900 leading-tight">{data.responsibility_am} / {data.responsibility_en}</span>
-          </div>
-
-          <div className="grid grid-cols-2 gap-x-1">
-            <div className="flex flex-col">
-              <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">BLOOD TYPE / የደም አይነት</span>
-              <span className="text-[6px] font-bold text-red-600 leading-tight">{data.blood_type || "N/A"}</span>
+            <div className="grid grid-cols-1 gap-0.5">
+              <div>
+                <div className="text-[4.5px] font-bold uppercase" style={{ color: 'rgba(30, 58, 138, 0.6)' }}>RANK / ማዕረግ</div>
+                <div className="text-[7.5px] font-bold truncate" style={{ color: '#0f172a' }}>{data.rank_am} / <span className="text-[6.5px] font-medium uppercase" style={{ color: '#475569' }}>{data.rank_en}</span></div>
+              </div>
             </div>
-            <div className="flex flex-col">
-              <span className="text-[4.5px] text-[#1e3a8ab3] font-bold leading-none">የጡረታ መለያ ቁጥር</span>
-              <span className="text-[6px] font-bold text-gray-900 leading-tight">{data.badge_number || "N/A"}</span>
+
+            <div>
+              <div className="text-[4.5px] font-bold uppercase" style={{ color: 'rgba(30, 58, 138, 0.6)' }}>RESPONSIBILITY / ሀላፊነት</div>
+              <div className="text-[7.5px] font-bold truncate" style={{ color: '#0f172a' }}>{data.responsibility_am} / {data.responsibility_en}</div>
             </div>
           </div>
         </div>
 
-        {/* Right Side: Photo & Barcode */}
-        <div className="w-20 flex flex-col items-center justify-center pr-1">
-          <div className="w-18 h-24 bg-white border border-amber-500 rounded-md overflow-hidden shadow-inner">
+        {/* Right Column: Photo */}
+        <div className="w-[22mm] flex flex-col items-center justify-center">
+          <div className="w-[20mm] h-[25mm] bg-white border-2 rounded-lg overflow-hidden shadow-md relative" style={{ borderColor: '#f59e0b' }}>
             {data.photo_url ? (
-              <img src={data.photo_url} className="w-full h-full object-cover" alt="Member" />
+              <img 
+                src={data.photo_url} 
+                className="w-full h-full object-contain bg-slate-50" 
+                alt="Member" 
+              />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-[#d977064d]">
-                <User size={28} />
+              <div className="w-full h-full flex items-center justify-center text-amber-200">
+                <User size={35} />
               </div>
             )}
           </div>
-          <div className="mt-0.5 scale-[0.3] origin-top">
-            <Barcode value={data.id_number || "BGR-POL-00000"} height={22} width={1.1} fontSize={0} margin={0} />
-          </div>
+          <div className="mt-0.5 text-[5px] font-bold uppercase tracking-widest" style={{ color: 'rgba(30, 58, 138, 0.4)' }}>Official Photo</div>
         </div>
       </div>
 
       {/* Footer Accent */}
-      <div className="absolute bottom-0 left-0 right-0 h-1 bg-blue-900"></div>
+      <div className="absolute bottom-0 left-0 right-0 h-1.5 flex" style={{ backgroundColor: '#1e3a8a' }}>
+        <div className="h-full w-1/3" style={{ backgroundColor: '#facc15' }}></div>
+        <div className="h-full w-1/3" style={{ backgroundColor: '#16a34a' }}></div>
+        <div className="h-full w-1/3" style={{ backgroundColor: '#1e3a8a' }}></div>
+      </div>
     </div>
   );
 });
@@ -154,81 +155,107 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
   return (
     <div 
       ref={ref}
-      className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] overflow-hidden flex flex-col p-[4mm] select-none box-border"
+      className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] overflow-hidden flex flex-col p-[2mm] select-none box-border"
       style={{ 
         printColorAdjust: 'exact',
         backgroundColor: '#ffffff',
-        border: '0.1mm solid rgba(0, 0, 0, 0.1)'
+        border: '0.2mm solid rgba(0, 0, 0, 0.05)'
       }}
     >
       {/* Watermark */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-[0.05] pointer-events-none">
-        <img src={assets.police_logo || "https://picsum.photos/seed/logo/200/200"} className="w-48 h-48 object-contain" alt="Watermark" />
+      <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+        <img src={assets.police_logo || "https://picsum.photos/seed/logo/200/200"} className="w-64 h-64 object-contain mix-blend-multiply" alt="Watermark" />
       </div>
 
-      <div className="relative z-10 flex h-full gap-4 items-center">
-        {/* Left: Large QR Code Section */}
-        <div className="flex flex-col items-center justify-center space-y-1">
-          <span className="text-[6px] font-bold text-blue-900 uppercase tracking-wider">VERIFICATION / ማረጋገጫ</span>
-          <div className="p-1.5 bg-white border border-slate-100 rounded-lg shadow-sm">
-            <QRCodeSVG 
-              value={`${window.location.origin}/verify/${data.id_number}`} 
-              size={100} 
-            />
+      <div className="relative z-10 flex flex-col h-full">
+        {/* Top: Notice Section */}
+        <div className="flex-1 flex flex-col justify-start space-y-0.5 border-b pb-1" style={{ borderBottomColor: '#f1f5f9' }}>
+          <div className="flex items-center gap-2 mb-0.5">
+            <div className="text-white text-[6px] font-black px-2 py-0.5 rounded-sm uppercase tracking-[0.1em] shadow-sm flex items-center gap-1" style={{ backgroundColor: '#dc2626' }}>
+              <ShieldAlert size={7} />
+              ማስታወቂያ / NOTICE
+            </div>
+            <div className="flex-1 h-[0.3mm] bg-gradient-to-r from-red-600/40 to-transparent"></div>
           </div>
-          <div className="flex flex-col items-center mt-1">
-            <span className="text-[5px] font-bold text-gray-400 uppercase">ID NO / መታወቂያ ቁጥር</span>
-            <span className="text-[7px] font-black text-blue-900">{data.id_number}</span>
+          <p className="text-[7px] font-extrabold leading-tight text-justify" style={{ color: '#0f172a' }}>
+            ይህ የመታወቂያ ካርድ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን ንብረት ነው፡፡ ይህንን መታወቂያ የያዘ ግለሰብ የኮሚሽኑ የፖሊስ አባል በመሆኑ ሕግን የማስከበርና የማስገደድ ሙሉ ሥልጣን ተሰጥቶታል፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
+          </p>
+          <p className="text-[6px] font-bold italic leading-tight text-justify" style={{ color: '#64748b' }}>
+            This identity card is the property of the BGR Police Commission. The holder is a member of the police commission and is fully authorized to enforce the law. If found, please return it to the nearest police station.
+          </p>
+        </div>
+
+        {/* Middle: Details in Two Lines */}
+        <div className="py-1 flex flex-col gap-0.5 border-b" style={{ borderBottomColor: '#f1f5f9' }}>
+          <div className="flex items-center justify-center gap-2.5">
+            <div className="flex items-center gap-1">
+              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>ፆታ / GENDER:</span>
+              <span className="text-[6.5px] font-black" style={{ color: '#1e293b' }}>{data.gender || "N/A"}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>ቁመት / HEIGHT:</span>
+              <span className="text-[6.5px] font-black" style={{ color: '#1e293b' }}>{data.height || "N/A"}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>መልክ / COMPLEXION:</span>
+              <span className="text-[6.5px] font-black" style={{ color: '#1e293b' }}>{data.complexion || "N/A"}</span>
+            </div>
+          </div>
+          <div className="flex items-center justify-center gap-2.5">
+            <div className="flex items-center gap-1">
+              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>ስልክ / PHONE:</span>
+              <span className="text-[6.5px] font-black" style={{ color: '#1d4ed8' }}>{data.phone || "N/A"}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>ደም / BLOOD:</span>
+              <span className="text-[6.5px] font-black" style={{ color: '#dc2626' }}>{data.blood_type || "N/A"}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>ጡረታ / BADGE:</span>
+              <span className="text-[6.5px] font-black" style={{ color: '#1e293b' }}>{data.badge_number || "N/A"}</span>
+            </div>
           </div>
         </div>
 
-        {/* Middle: Personal Details */}
-        <div className="flex-1 flex flex-col justify-center space-y-1 border-l border-slate-100 pl-4">
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1">
-            <div className="flex flex-col">
-              <span className="text-[5px] text-slate-400 font-bold uppercase">GENDER / ፆታ</span>
-              <span className="text-[7px] font-bold text-slate-800">{data.gender || "N/A"}</span>
+        {/* Bottom: QR, Emergency, Signature */}
+        <div className="h-[24mm] flex items-center justify-between pt-1">
+          {/* QR Code (Even Larger) */}
+          <div className="flex flex-col items-center gap-0.5">
+            <div className="p-1.5 bg-white border rounded-lg shadow-md" style={{ borderColor: '#e2e8f0' }}>
+              <QRCodeSVG 
+                value={`${window.location.origin}/verify/${data.id_number}`} 
+                size={85} 
+                level="H"
+              />
             </div>
-            <div className="flex flex-col">
-              <span className="text-[5px] text-slate-400 font-bold uppercase">HEIGHT / ቁመት</span>
-              <span className="text-[7px] font-bold text-slate-800">{data.height || "N/A"}</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-[5px] text-slate-400 font-bold uppercase">COMPLEXION / መልክ</span>
-              <span className="text-[7px] font-bold text-slate-800">{data.complexion || "N/A"}</span>
-            </div>
+            <span className="text-[5px] font-black tracking-tighter" style={{ color: '#1e3a8a' }}>{data.id_number}</span>
           </div>
-          
-          <div className="pt-1 border-t border-slate-50 mt-1">
-            <span className="text-[5px] text-slate-400 font-bold uppercase">የአደጋ ጊዜ ተጠሪ</span>
-            <div className="flex flex-col">
-              <span className="text-[7px] font-bold text-slate-800">{data.emergency_contact_name || "N/A"}</span>
-              <span className="text-[7px] font-bold text-blue-700">{data.emergency_contact_phone || "N/A"}</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Right: Text and Signature */}
-        <div className="w-32 flex flex-col justify-between h-full py-1">
-          <div className="space-y-1.5">
-            <p className="text-[7px] font-bold text-gray-800 leading-tight">
-              ይህንን መታወቂያ የያዘ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን የፖሊስ አባል ነዉ፤ ህግን የማስከበር ስልጣን ተሰጥቶታል፡፡
-            </p>
-            <p className="text-[6px] font-medium text-gray-600 italic leading-tight">
-              This ID holder is a member of the BGR Police Commission; authorized to enforce the law.
-            </p>
+          {/* Emergency Contact */}
+          <div className="flex flex-col items-center text-center px-2 border-x h-full justify-center" style={{ borderLeftColor: '#f1f5f9', borderRightColor: '#f1f5f9' }}>
+            <span className="text-[4px] font-bold uppercase mb-0.5" style={{ color: '#94a3b8' }}>Emergency Contact</span>
+            <span className="text-[6px] font-bold leading-tight truncate max-w-[25mm]" style={{ color: '#1e293b' }}>{data.emergency_contact_name || "N/A"}</span>
+            <span className="text-[6.5px] font-black" style={{ color: '#1d4ed8' }}>{data.emergency_contact_phone || "N/A"}</span>
           </div>
-          
-          <div className="flex flex-col items-center mt-2">
-            {data.commissioner_signature ? (
-              <img src={data.commissioner_signature} className="h-8 w-24 object-contain mix-blend-multiply" alt="Signature" />
-            ) : (
-              <div className="h-8 w-24 border-b border-gray-400 mb-1"></div>
-            )}
-            <span className="text-[5px] font-bold text-gray-500 uppercase text-center">COMMISSIONER SIGNATURE / የኮሚሽነሩ ፊርማ</span>
+
+          {/* Signature */}
+          <div className="flex flex-col items-center w-[25mm]">
+            <div className="h-12 w-full flex items-center justify-center relative">
+              {data.commissioner_signature ? (
+                <img src={data.commissioner_signature} className="h-full w-full object-contain mix-blend-multiply" alt="Signature" />
+              ) : (
+                <div className="w-full border-b mb-1" style={{ borderBottomColor: '#cbd5e1' }}></div>
+              )}
+            </div>
+            <div className="text-[4px] font-bold uppercase text-center leading-none mt-1" style={{ color: '#94a3b8' }}>
+              Commissioner Signature<br/>የኮሚሽነሩ ፊርማ
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Security Strip */}
+      <div className="absolute top-0 right-0 w-1 h-full bg-gradient-to-b from-yellow-400 via-green-600 to-blue-900 opacity-20"></div>
     </div>
   );
 });
@@ -275,7 +302,9 @@ export default function App() {
   });
 
   const handlePrintSide = (side: 'front' | 'back' | 'both') => {
+    setLoading(true);
     setPrintSide(side);
+    
     // Use a longer delay to ensure React has rendered the changes
     // and the print container is ready in the DOM
     setTimeout(() => {
@@ -285,9 +314,14 @@ export default function App() {
         } catch (error) {
           console.error("Print trigger failed:", error);
           alert("Printing failed. This often happens if the browser blocks the print window. Please check your browser settings or try a different browser.");
+        } finally {
+          setLoading(false);
         }
+      } else {
+        setLoading(false);
+        alert("Print container not found. Please try again.");
       }
-    }, 1000);
+    }, 1500);
   };
 
   const [showScans, setShowScans] = useState(false);
@@ -331,6 +365,23 @@ export default function App() {
     }
     return res;
   };
+
+  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
+
+  useEffect(() => {
+    const checkServer = async () => {
+      try {
+        const res = await fetch('/api/health');
+        if (res.ok) setServerStatus('online');
+        else setServerStatus('offline');
+      } catch (e) {
+        setServerStatus('offline');
+      }
+    };
+    checkServer();
+    const interval = setInterval(checkServer, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogin = async (credentials: any) => {
     console.log("Attempting login with:", credentials.username);
@@ -441,134 +492,96 @@ export default function App() {
 
   const handleDownload = async (idNumber: string, side: 'front' | 'back' | 'both') => {
     setLoading(true);
+    let captureContainer: HTMLDivElement | null = null;
+    
     try {
       // Small delay to ensure all images/fonts are fully rendered
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      if (side === 'both') {
-        const front = document.getElementById(`card-front-${idNumber}`);
-        const back = document.getElementById(`card-back-${idNumber}`);
-        if (!front || !back) return;
+      captureContainer = document.createElement('div');
+      captureContainer.style.position = 'absolute';
+      captureContainer.style.left = '-9999px';
+      captureContainer.style.top = '0';
+      captureContainer.style.display = 'flex';
+      captureContainer.style.flexDirection = 'column';
+      captureContainer.style.gap = '40px';
+      captureContainer.style.padding = '40px';
+      captureContainer.style.backgroundColor = '#ffffff';
 
-        // Create a temporary container for both
-        const container = document.createElement('div');
-        container.style.display = 'flex';
-        container.style.flexDirection = 'column';
-        container.style.alignItems = 'center';
-        container.style.gap = '40px';
-        container.style.padding = '40px';
-        container.style.backgroundColor = 'white';
-        container.style.position = 'fixed';
-        container.style.top = '-10000px';
-        container.style.left = '-10000px';
-        
-        const frontClone = front.cloneNode(true) as HTMLElement;
-        const backClone = back.cloneNode(true) as HTMLElement;
-        
-        // Reset scales and shadows on clones for clean capture
-        frontClone.style.transform = 'none';
-        frontClone.style.boxShadow = 'none';
-        frontClone.style.margin = '0';
-        
-        backClone.style.transform = 'none';
-        backClone.style.boxShadow = 'none';
-        backClone.style.margin = '0';
-        
-        container.appendChild(frontClone);
-        container.appendChild(backClone);
-        document.body.appendChild(container);
+      const sidesToCapture = side === 'both' ? ['front', 'back'] : [side];
+      let foundAny = false;
+      
+      for (const s of sidesToCapture) {
+        const element = document.getElementById(`card-${s}-${idNumber}`);
+        if (!element) {
+          console.warn(`Element card-${s}-${idNumber} not found`);
+          continue;
+        }
 
-        const canvas = await html2canvas(container, {
-          scale: 4,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          onclone: (clonedDoc) => {
-            const elements = clonedDoc.getElementsByTagName('*');
-            for (let i = 0; i < elements.length; i++) {
-              const el = elements[i] as HTMLElement;
-              const style = window.getComputedStyle(el);
-              
-              // Check all relevant color properties
-              const props = ['color', 'background-color', 'border-color', 'box-shadow', 'fill', 'stroke'];
-              props.forEach(prop => {
-                const value = style.getPropertyValue(prop);
-                if (value && (value.includes('oklch') || value.includes('oklab'))) {
-                  // Force a safe fallback
-                  if (prop === 'box-shadow') {
-                    el.style.setProperty(prop, 'none', 'important');
-                  } else if (prop === 'background-color') {
-                    // Try to keep it transparent if it's a modern color we can't parse
-                    el.style.setProperty(prop, 'transparent', 'important');
-                  } else if (prop === 'border-color') {
-                    el.style.setProperty(prop, 'currentColor', 'important');
-                  } else {
-                    el.style.setProperty(prop, 'inherit', 'important');
-                  }
-                }
-              });
-            }
-          }
-        });
-
-        const link = document.createElement('a');
-        link.download = `BGR_Police_ID_${idNumber}_Full.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-        
-        document.body.removeChild(container);
-      } else {
-        const element = document.getElementById(`card-${side}-${idNumber}`);
-        if (!element) return;
-        
-        // Clone to avoid scale issues
+        foundAny = true;
         const clone = element.cloneNode(true) as HTMLElement;
         clone.style.transform = 'none';
-        clone.style.position = 'fixed';
-        clone.style.top = '-10000px';
-        document.body.appendChild(clone);
-
-        const canvas = await html2canvas(clone, {
-          scale: 3,
-          useCORS: true,
-          logging: false,
-          backgroundColor: null,
-          onclone: (clonedDoc) => {
-            const elements = clonedDoc.getElementsByTagName('*');
-            for (let i = 0; i < elements.length; i++) {
-              const el = elements[i] as HTMLElement;
-              const style = window.getComputedStyle(el);
-              
-              const props = ['color', 'background-color', 'border-color', 'box-shadow', 'fill', 'stroke'];
-              props.forEach(prop => {
-                const value = style.getPropertyValue(prop);
-                if (value && (value.includes('oklch') || value.includes('oklab'))) {
-                  if (prop === 'box-shadow') {
-                    el.style.setProperty(prop, 'none', 'important');
-                  } else if (prop === 'background-color') {
-                    el.style.setProperty(prop, 'transparent', 'important');
-                  } else if (prop === 'border-color') {
-                    el.style.setProperty(prop, 'currentColor', 'important');
-                  } else {
-                    el.style.setProperty(prop, 'inherit', 'important');
-                  }
-                }
-              });
-            }
-          }
+        clone.style.boxShadow = 'none';
+        clone.style.margin = '0';
+        clone.style.position = 'relative';
+        clone.style.display = 'flex';
+        clone.style.width = '85.6mm';
+        clone.style.height = '53.98mm';
+        
+        // Remove mix-blend-multiply as it breaks html2canvas rendering
+        const blended = clone.querySelectorAll('.mix-blend-multiply');
+        blended.forEach(el => (el as HTMLElement).classList.remove('mix-blend-multiply'));
+        
+        // Ensure images have crossOrigin set
+        const images = clone.querySelectorAll('img');
+        images.forEach(img => {
+          img.setAttribute('crossorigin', 'anonymous');
         });
-        
-        const link = document.createElement('a');
-        link.download = `BGR_Police_ID_${idNumber}_${side}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-        
-        document.body.removeChild(clone);
+
+        captureContainer.appendChild(clone);
       }
+      
+      if (!foundAny) throw new Error("No card elements found to capture");
+
+      document.body.appendChild(captureContainer);
+
+      const canvas = await html2canvas(captureContainer, {
+        scale: 2, // Moderate scale for better compatibility
+        useCORS: true,
+        logging: true, // Enable logging for debugging
+        backgroundColor: '#ffffff',
+        allowTaint: false,
+        imageTimeout: 30000,
+        onclone: (clonedDoc) => {
+          const style = clonedDoc.createElement('style');
+          style.innerHTML = `
+            * { 
+              color-scheme: light !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            .mix-blend-multiply { mix-blend-mode: normal !important; }
+          `;
+          clonedDoc.head.appendChild(style);
+        }
+      });
+
+      const dataUrl = canvas.toDataURL('image/png', 1.0);
+      const safeId = idNumber.replace(/[^a-z0-9]/gi, '_');
+      const link = document.createElement('a');
+      link.download = `BGR_Police_ID_${safeId}_${side}.png`;
+      link.href = dataUrl;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
     } catch (error) {
       console.error('Download error:', error);
-      alert('Failed to download image. Please try again.');
+      alert('ዳውንሎድ ማድረግ አልተቻለም። እባክዎ በድጋሚ ይሞክሩ ወይም "Print" የሚለውን አማራጭ ይጠቀሙ። (Download failed. Please try again or use the Print option.)');
     } finally {
+      if (captureContainer && captureContainer.parentNode) {
+        document.body.removeChild(captureContainer);
+      }
       setLoading(false);
     }
   };
@@ -708,7 +721,7 @@ export default function App() {
   }
 
   if (!token) {
-    return <Login onLogin={handleLogin} loading={loading} />;
+    return <Login onLogin={handleLogin} loading={loading} serverStatus={serverStatus} />;
   }
 
   return (
@@ -1182,9 +1195,9 @@ export default function App() {
         style={{ position: 'absolute', left: '0', top: '0', width: '100%', height: '0', overflow: 'hidden', opacity: 0, pointerEvents: 'none', zIndex: -1000 }}
         className="no-print"
       >
-        <div ref={printRef} key={`${selectedRecord?.id}-${printSide}`} className="print-container bg-white">
+        <div ref={printRef} key={`${selectedRecord?.id}-${printSide}`} className="print-container">
           {selectedRecord && (
-            <div className="flex flex-col items-center gap-8">
+            <>
               {(printSide === 'both' || printSide === 'front') && (
                 <div className="print-card">
                   <IDCardFront data={selectedRecord} assets={assets} />
@@ -1195,10 +1208,36 @@ export default function App() {
                   <IDCardBack data={selectedRecord} assets={assets} />
                 </div>
               )}
-            </div>
+            </>
           )}
         </div>
       </div>
+
+      {/* Global Loading Overlay for Downloads */}
+      <AnimatePresence>
+        {loading && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[1000] bg-white/80 backdrop-blur-md flex flex-col items-center justify-center"
+          >
+            <div className="relative">
+              <div className="w-24 h-24 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Download className="text-blue-600 animate-bounce" size={32} />
+              </div>
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800 mt-8">መታወቂያው እየተዘጋጀ ነው...</h3>
+            <p className="text-slate-500 mt-2 font-medium">Preparing ID Card... Please wait a moment.</p>
+            <div className="mt-8 flex gap-2">
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
+              <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
@@ -1258,60 +1297,56 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record
         <div className="p-8 lg:p-12 flex-1 overflow-y-auto bg-slate-50">
           <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-12 lg:gap-20 min-h-full">
             {/* Front Side */}
-            {(activeTab === 'both' || activeTab === 'front') && (
-              <div className="space-y-6 flex flex-col items-center w-full lg:w-auto">
-                <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Front Side / የፊት ገፅ</span>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => onPrint('front')}
-                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                      title="Print Front Only"
-                    >
-                      <Printer size={14} />
-                    </button>
-                    <button 
-                      onClick={() => onDownload('front')}
-                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                      title="Download Front Only"
-                    >
-                      <Download size={14} />
-                    </button>
-                  </div>
-                </div>
-                <div id={`card-front-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
-                  <IDCardFront data={record} assets={assets} />
+            <div className={`space-y-6 flex flex-col items-center w-full lg:w-auto ${activeTab === 'back' ? 'hidden lg:flex opacity-0 pointer-events-none absolute' : 'flex'}`}>
+              <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Front Side / የፊት ገፅ</span>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => onPrint('front')}
+                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                    title="Print Front Only"
+                  >
+                    <Printer size={14} />
+                  </button>
+                  <button 
+                    onClick={() => onDownload('front')}
+                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                    title="Download Front Only"
+                  >
+                    <Download size={14} />
+                  </button>
                 </div>
               </div>
-            )}
+              <div id={`card-front-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
+                <IDCardFront data={record} assets={assets} />
+              </div>
+            </div>
 
             {/* Back Side */}
-            {(activeTab === 'both' || activeTab === 'back') && (
-              <div className="space-y-6 flex flex-col items-center w-full lg:w-auto">
-                <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
-                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Back Side / የጀርባ ገፅ</span>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={() => onPrint('back')}
-                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                      title="Print Back Only"
-                    >
-                      <Printer size={14} />
-                    </button>
-                    <button 
-                      onClick={() => onDownload('back')}
-                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                      title="Download Back Only"
-                    >
-                      <Download size={14} />
-                    </button>
-                  </div>
-                </div>
-                <div id={`card-back-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
-                  <IDCardBack data={record} assets={assets} />
+            <div className={`space-y-6 flex flex-col items-center w-full lg:w-auto ${activeTab === 'front' ? 'hidden lg:flex opacity-0 pointer-events-none absolute' : 'flex'}`}>
+              <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
+                <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Back Side / የጀርባ ገፅ</span>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => onPrint('back')}
+                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                    title="Print Back Only"
+                  >
+                    <Printer size={14} />
+                  </button>
+                  <button 
+                    onClick={() => onDownload('back')}
+                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                    title="Download Back Only"
+                  >
+                    <Download size={14} />
+                  </button>
                 </div>
               </div>
-            )}
+              <div id={`card-back-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
+                <IDCardBack data={record} assets={assets} />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -1411,7 +1446,7 @@ function FormInput({ label, value, onChange, placeholder, icon }: { label: strin
   );
 }
 
-function Login({ onLogin, loading }: { onLogin: (c: any) => void, loading: boolean }) {
+function Login({ onLogin, loading, serverStatus }: { onLogin: (c: any) => void, loading: boolean, serverStatus: 'checking' | 'online' | 'offline' }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -1433,6 +1468,15 @@ function Login({ onLogin, loading }: { onLogin: (c: any) => void, loading: boole
           </div>
           <h2 className="text-2xl font-bold">BGR Police Commission</h2>
           <p className="text-blue-100 text-sm mt-1">ID Management System Login</p>
+          <div className="mt-4 flex justify-center items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${
+              serverStatus === 'online' ? 'bg-emerald-400 animate-pulse' : 
+              serverStatus === 'offline' ? 'bg-red-400' : 'bg-slate-400'
+            }`} />
+            <span className="text-[10px] font-bold uppercase tracking-widest text-blue-100">
+              System: {serverStatus}
+            </span>
+          </div>
         </div>
         
         <form onSubmit={handleSubmit} className="p-10 space-y-6">
