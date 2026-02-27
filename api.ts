@@ -1,24 +1,20 @@
-// src/api/api.ts
+const API_BASE = import.meta.env.VITE_API_URL;
 
-export async function apiFetch(
-  url: string,
-  options: RequestInit = {}
-) {
+export async function apiFetch(path: string, options: RequestInit = {}) {
   const token = localStorage.getItem("token");
 
-  const res = await fetch(url, {
+  const res = await fetch(API_BASE + path, {
     headers: {
       "Content-Type": "application/json",
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(options.headers || {}),
     },
     ...options,
   });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw err;
+  const text = await res.text();
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error("Non-JSON response: " + text);
   }
-
-  return res.json();
 }
