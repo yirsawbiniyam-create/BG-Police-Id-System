@@ -413,6 +413,44 @@ app.post("/api/ids", authenticateToken, authorizeRole(['Administrator', 'Data En
   }
 });
 
+app.put("/api/ids/:id", authenticateToken, authorizeRole(['Administrator', 'Data Entry']), async (req, res) => {
+  const { 
+    full_name_am, full_name_en, 
+    rank_am, rank_en, 
+    responsibility_am, responsibility_en, 
+    phone, photo_url, commissioner_signature,
+    blood_type, badge_number, gender, complexion,
+    height, emergency_contact_name, emergency_contact_phone
+  } = req.body;
+
+  const currentDb = await initDb();
+  if (!currentDb) return res.status(500).json({ error: "Database not available" });
+
+  const stmt = currentDb.prepare(`
+    UPDATE ids SET 
+      full_name_am = ?, full_name_en = ?, 
+      rank_am = ?, rank_en = ?, 
+      responsibility_am = ?, responsibility_en = ?, 
+      phone = ?, photo_url = ?, commissioner_signature = ?,
+      blood_type = ?, badge_number = ?, gender = ?, complexion = ?, 
+      height = ?, emergency_contact_name = ?, emergency_contact_phone = ?
+    WHERE id = ?
+  `);
+  
+  try {
+    stmt.run(
+      full_name_am, full_name_en, rank_am, rank_en, 
+      responsibility_am, responsibility_en, phone, photo_url, commissioner_signature,
+      blood_type, badge_number, gender, complexion, height, 
+      emergency_contact_name, emergency_contact_phone,
+      req.params.id
+    );
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get("/api/ids/:id_number", async (req, res) => {
   // Publicly accessible for scanning, but maybe we want to restrict it?
   // For now, keep it public as it's for verification.

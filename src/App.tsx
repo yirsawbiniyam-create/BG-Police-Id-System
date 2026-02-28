@@ -5,7 +5,7 @@ import {
   Shield, User, Phone, Briefcase, Award, 
   ChevronRight, Languages, Loader2, Camera,
   Eye, X, Check, Database as DbIcon, RefreshCw, HardDrive,
-  ShieldAlert
+  ShieldAlert, Edit
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -298,7 +298,26 @@ export default function App() {
   const [showPreview, setShowPreview] = useState(false);
   const [backups, setBackups] = useState<any[]>([]);
 
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    id: number | null;
+    full_name_am: string;
+    full_name_en: string;
+    rank_am: string;
+    rank_en: string;
+    responsibility_am: string;
+    responsibility_en: string;
+    phone: string;
+    photo_url: string;
+    blood_type: string;
+    badge_number: string;
+    gender: string;
+    complexion: string;
+    height: string;
+    emergency_contact_name: string;
+    emergency_contact_phone: string;
+    commissioner_signature: string;
+  }>({
+    id: null,
     full_name_am: '',
     full_name_en: '',
     rank_am: '',
@@ -317,14 +336,14 @@ export default function App() {
     commissioner_signature: ''
   });
 
-  const [printSide, setPrintSide] = useState<'front' | 'back' | 'both'>('both');
+  const [printSide, setPrintSide] = useState<'front' | 'back' | 'both' | 'combined'>('both');
   const printRef = useRef<HTMLDivElement>(null);
   const handlePrint = useReactToPrint({
     contentRef: printRef,
     documentTitle: "Police_ID_Card",
   });
 
-  const handlePrintSide = (side: 'front' | 'back' | 'both') => {
+  const handlePrintSide = (side: 'front' | 'back' | 'both' | 'combined') => {
     setLoading(true);
     setPrintSide(side);
     
@@ -743,18 +762,23 @@ export default function App() {
         }
       }
 
-      const res = await apiFetch('/api/ids', {
-        method: 'POST',
+      const isUpdate = !!finalData.id;
+      const url = isUpdate ? `/api/ids/${finalData.id}` : '/api/ids';
+      const method = isUpdate ? 'PUT' : 'POST';
+
+      const res = await apiFetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(finalData)
       });
       
-      if (!res.ok) throw new Error('Failed to create ID');
+      if (!res.ok) throw new Error(`Failed to ${isUpdate ? 'update' : 'create'} ID`);
       
       const result = await res.json();
       if (result.success) {
         fetchRecords();
         setFormData({
+          id: null,
           full_name_am: '', full_name_en: '',
           rank_am: '', rank_en: '',
           responsibility_am: '', responsibility_en: '',
@@ -765,6 +789,7 @@ export default function App() {
           commissioner_signature: ''
         });
         setView('history');
+        alert(isUpdate ? "መረጃው በትክክል ተሻሽሏል!" : "መታወቂያው በትክክል ተመዝግቧል!");
       }
     } catch (error) {
       console.error("Submission error:", error);
@@ -805,7 +830,25 @@ export default function App() {
             <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
               <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<Shield size={18} />} label="Dashboard" />
               {(user?.role === 'Administrator' || user?.role === 'Data Entry') && (
-                <NavButton active={view === 'create'} onClick={() => setView('create')} icon={<Plus size={18} />} label="New ID" />
+                <NavButton 
+                  active={view === 'create'} 
+                  onClick={() => {
+                    setFormData({
+                      id: null,
+                      full_name_am: '', full_name_en: '',
+                      rank_am: '', rank_en: '',
+                      responsibility_am: '', responsibility_en: '',
+                      phone: '', photo_url: '',
+                      blood_type: '', badge_number: '',
+                      gender: '', complexion: '', height: '',
+                      emergency_contact_name: '', emergency_contact_phone: '',
+                      commissioner_signature: ''
+                    });
+                    setView('create');
+                  }} 
+                  icon={<Plus size={18} />} 
+                  label="New ID" 
+                />
               )}
               <NavButton active={view === 'history'} onClick={() => setView('history')} icon={<History size={18} />} label="Records" />
               {user?.role === 'Administrator' && (
@@ -901,8 +944,8 @@ export default function App() {
               <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
                 <div className="p-8 bg-blue-600 text-white flex justify-between items-center">
                   <div>
-                    <h2 className="text-2xl font-bold">Create New Member ID</h2>
-                    <p className="text-blue-100 text-sm">Fill in the details. Missing translations will be generated automatically.</p>
+                    <h2 className="text-2xl font-bold">{formData.id ? 'Edit Member ID' : 'Create New Member ID'}</h2>
+                    <p className="text-blue-100 text-sm">{formData.id ? 'Update member details' : 'Fill in the details. Missing translations will be generated automatically.'}</p>
                   </div>
                 </div>
 
@@ -1006,7 +1049,7 @@ export default function App() {
                       className="px-10 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                       {(loading || translating) && <Loader2 className="animate-spin" size={18} />}
-                      {translating ? 'Translating...' : 'Generate ID Card'}
+                      {translating ? 'Translating...' : (formData.id ? 'Update Member ID' : 'Generate ID Card')}
                     </button>
                   </div>
                 </form>
@@ -1111,7 +1154,20 @@ export default function App() {
                 <h2 className="text-2xl font-bold text-slate-900">Member Records</h2>
                 {(user?.role === 'Administrator' || user?.role === 'Data Entry') && (
                   <button 
-                    onClick={() => setView('create')}
+                    onClick={() => {
+                      setFormData({
+                        id: null,
+                        full_name_am: '', full_name_en: '',
+                        rank_am: '', rank_en: '',
+                        responsibility_am: '', responsibility_en: '',
+                        phone: '', photo_url: '',
+                        blood_type: '', badge_number: '',
+                        gender: '', complexion: '', height: '',
+                        emergency_contact_name: '', emergency_contact_phone: '',
+                        commissioner_signature: ''
+                      });
+                      setView('create');
+                    }}
                     className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all"
                   >
                     <Plus size={20} />
@@ -1155,6 +1211,34 @@ export default function App() {
                         <td className="px-6 py-4 text-sm text-slate-600">{record.phone}</td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button 
+                              onClick={() => {
+                                setFormData({
+                                  id: record.id,
+                                  full_name_am: record.full_name_am,
+                                  full_name_en: record.full_name_en,
+                                  rank_am: record.rank_am,
+                                  rank_en: record.rank_en,
+                                  responsibility_am: record.responsibility_am,
+                                  responsibility_en: record.responsibility_en,
+                                  phone: record.phone,
+                                  photo_url: record.photo_url,
+                                  blood_type: record.blood_type,
+                                  badge_number: record.badge_number,
+                                  gender: record.gender,
+                                  complexion: record.complexion,
+                                  height: record.height,
+                                  emergency_contact_name: record.emergency_contact_name,
+                                  emergency_contact_phone: record.emergency_contact_phone,
+                                  commissioner_signature: record.commissioner_signature
+                                });
+                                setView('create');
+                              }}
+                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                              title="Edit Record"
+                            >
+                              <Edit size={18} />
+                            </button>
                             <button 
                               onClick={() => fetchScans(record.id_number)}
                               className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
@@ -1203,6 +1287,31 @@ export default function App() {
             onClose={() => setShowPreview(false)} 
             onPrint={(side) => handlePrintSide(side)} 
             onDownload={(side) => handleDownload(selectedRecord.id_number, side)}
+            onEdit={() => {
+              if (selectedRecord) {
+                setFormData({
+                  id: selectedRecord.id,
+                  full_name_am: selectedRecord.full_name_am,
+                  full_name_en: selectedRecord.full_name_en,
+                  rank_am: selectedRecord.rank_am,
+                  rank_en: selectedRecord.rank_en,
+                  responsibility_am: selectedRecord.responsibility_am,
+                  responsibility_en: selectedRecord.responsibility_en,
+                  phone: selectedRecord.phone,
+                  photo_url: selectedRecord.photo_url,
+                  blood_type: selectedRecord.blood_type,
+                  badge_number: selectedRecord.badge_number,
+                  gender: selectedRecord.gender,
+                  complexion: selectedRecord.complexion,
+                  height: selectedRecord.height,
+                  emergency_contact_name: selectedRecord.emergency_contact_name,
+                  emergency_contact_phone: selectedRecord.emergency_contact_phone,
+                  commissioner_signature: selectedRecord.commissioner_signature
+                });
+                setShowPreview(false);
+                setView('create');
+              }
+            }}
           />
         )}
       </AnimatePresence>
@@ -1260,15 +1369,28 @@ export default function App() {
         <div ref={printRef} key={`${selectedRecord?.id}-${printSide}`} className="print-container">
           {selectedRecord && (
             <>
-              {(printSide === 'both' || printSide === 'front') && (
-                <div className="print-card">
-                  <IDCardFront data={selectedRecord} assets={assets} />
+              {printSide === 'combined' ? (
+                <div className="flex flex-col gap-0">
+                  <div className="print-card" style={{ pageBreakAfter: 'avoid' }}>
+                    <IDCardFront data={selectedRecord} assets={assets} />
+                  </div>
+                  <div className="print-card">
+                    <IDCardBack data={selectedRecord} assets={assets} />
+                  </div>
                 </div>
-              )}
-              {(printSide === 'both' || printSide === 'back') && (
-                <div className="print-card">
-                  <IDCardBack data={selectedRecord} assets={assets} />
-                </div>
+              ) : (
+                <>
+                  {(printSide === 'both' || printSide === 'front') && (
+                    <div className="print-card">
+                      <IDCardFront data={selectedRecord} assets={assets} />
+                    </div>
+                  )}
+                  {(printSide === 'both' || printSide === 'back') && (
+                    <div className="print-card">
+                      <IDCardBack data={selectedRecord} assets={assets} />
+                    </div>
+                  )}
+                </>
               )}
             </>
           )}
@@ -1306,8 +1428,8 @@ export default function App() {
 
 // --- Helper Components ---
 
-function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record: IDRecord, assets: Assets, onClose: () => void, onPrint: (side: 'front' | 'back' | 'both') => void, onDownload: (side: 'front' | 'back' | 'both') => void }) {
-  const [activeTab, setActiveTab] = useState<'front' | 'back' | 'both'>('both');
+function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit }: { record: IDRecord, assets: Assets, onClose: () => void, onPrint: (side: 'front' | 'back' | 'both' | 'combined') => void, onDownload: (side: 'front' | 'back' | 'both' | 'combined') => void, onEdit: () => void }) {
+  const [activeTab, setActiveTab] = useState<'front' | 'back' | 'both' | 'combined'>('both');
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -1349,6 +1471,12 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record
             >
               Both Sides
             </button>
+            <button 
+              onClick={() => setActiveTab('combined')}
+              className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'combined' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+            >
+              Combined
+            </button>
           </div>
 
           <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full transition-all">
@@ -1359,7 +1487,7 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record
         <div className="p-8 lg:p-12 flex-1 overflow-y-auto bg-slate-50">
           <div className="flex flex-col lg:flex-row items-center lg:items-start justify-center gap-12 lg:gap-20 min-h-full">
             {/* Front Side */}
-            <div className={`space-y-6 flex flex-col items-center w-full lg:w-auto ${activeTab === 'back' ? 'hidden lg:flex opacity-0 pointer-events-none absolute' : 'flex'}`}>
+            <div className={`space-y-6 flex flex-col items-center w-full lg:w-auto ${activeTab === 'back' || activeTab === 'combined' ? 'hidden lg:flex opacity-0 pointer-events-none absolute' : 'flex'}`}>
               <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Front Side / የፊት ገፅ</span>
                 <div className="flex gap-2">
@@ -1385,7 +1513,7 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record
             </div>
 
             {/* Back Side */}
-            <div className={`space-y-6 flex flex-col items-center w-full lg:w-auto ${activeTab === 'front' ? 'hidden lg:flex opacity-0 pointer-events-none absolute' : 'flex'}`}>
+            <div className={`space-y-6 flex flex-col items-center w-full lg:w-auto ${activeTab === 'front' || activeTab === 'combined' ? 'hidden lg:flex opacity-0 pointer-events-none absolute' : 'flex'}`}>
               <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Back Side / የጀርባ ገፅ</span>
                 <div className="flex gap-2">
@@ -1409,16 +1537,39 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record
                 <IDCardBack data={record} assets={assets} />
               </div>
             </div>
+
+            {/* Combined View */}
+            {activeTab === 'combined' && (
+              <div className="flex flex-col items-center gap-8 w-full">
+                <div className="flex flex-col items-center gap-4">
+                  <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Combined Layout / የተቀናጀ እይታ</span>
+                  <div className="flex flex-col gap-4 p-4 bg-white rounded-[3.18mm] shadow-2xl border border-slate-100 scale-110 sm:scale-125 lg:scale-150">
+                    <IDCardFront data={record} assets={assets} />
+                    <div className="border-t border-dashed border-slate-200"></div>
+                    <IDCardBack data={record} assets={assets} />
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
         <div className="p-8 bg-white border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
-          <button 
-            onClick={onClose}
-            className="w-full sm:w-auto px-8 py-3 rounded-2xl font-bold text-slate-600 hover:bg-slate-100 transition-all"
-          >
-            Back to Records
-          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={onEdit}
+              className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all flex items-center gap-2"
+            >
+              <Edit size={18} />
+              Edit
+            </button>
+            <button 
+              onClick={onClose}
+              className="w-full sm:w-auto px-8 py-3 rounded-2xl font-bold text-slate-600 hover:bg-slate-100 transition-all"
+            >
+              Back to Records
+            </button>
+          </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
             <button 
               onClick={() => onDownload('both')}
@@ -1426,6 +1577,13 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload }: { record
             >
               <Download size={24} />
               Download Full (Front & Back)
+            </button>
+            <button 
+              onClick={() => onPrint('combined')}
+              className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-2xl shadow-[#0596694d] hover:bg-emerald-700 transition-all flex items-center justify-center gap-3"
+            >
+              <Printer size={24} />
+              Print Combined
             </button>
             <button 
               onClick={() => onPrint('both')}
