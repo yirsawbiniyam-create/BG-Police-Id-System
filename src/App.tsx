@@ -538,6 +538,34 @@ export default function App() {
           img.setAttribute('crossorigin', 'anonymous');
         });
 
+        // Manually replace oklch/oklab colors in the clone
+        // html2canvas fails to parse these strings in CSS
+        const allElements = clone.getElementsByTagName('*');
+        for (let i = 0; i < allElements.length; i++) {
+          const el = allElements[i] as HTMLElement;
+          const style = window.getComputedStyle(el);
+          
+          const colorProps = ['color', 'backgroundColor', 'borderColor', 'fill', 'stroke'];
+          colorProps.forEach(prop => {
+            const cssProp = prop.replace(/[A-Z]/g, m => "-" + m.toLowerCase());
+            const value = style.getPropertyValue(cssProp);
+            if (value && (value.includes('oklch') || value.includes('oklab'))) {
+              // Fallback to safe colors
+              if (prop === 'color') el.style.color = '#1e293b';
+              if (prop === 'backgroundColor' && value !== 'rgba(0, 0, 0, 0)') {
+                el.style.backgroundColor = '#ffffff';
+              }
+              if (prop === 'borderColor') el.style.borderColor = '#e2e8f0';
+            }
+          });
+          
+          // Also handle box-shadow which often contains oklch
+          const shadow = style.getPropertyValue('box-shadow');
+          if (shadow && (shadow.includes('oklch') || shadow.includes('oklab'))) {
+            el.style.boxShadow = 'none';
+          }
+        }
+
         captureContainer.appendChild(clone);
       }
       

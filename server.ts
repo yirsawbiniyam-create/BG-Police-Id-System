@@ -591,11 +591,17 @@ async function startServer() {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
+    try {
+      console.log("Starting Vite in middleware mode...");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+      console.log("Vite middleware attached successfully.");
+    } catch (viteError) {
+      console.error("Failed to start Vite server:", viteError);
+    }
   } else {
     const distPath = path.join(__dirname, "dist");
     if (!fs.existsSync(distPath)) {
