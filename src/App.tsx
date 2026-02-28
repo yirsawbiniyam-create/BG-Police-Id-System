@@ -69,17 +69,29 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
 
       {/* Header */}
       <div className="relative z-10 flex justify-between items-start h-12 px-2 pt-1">
-        <img src={assets.bgr_flag || "https://picsum.photos/seed/bgr/100/60"} className="h-7 w-13 object-cover rounded-sm shadow-sm" alt="BGR Flag" />
+        <img 
+          src={assets.bgr_flag || "https://picsum.photos/seed/bgr/100/60"} 
+          className="h-7 w-12 object-cover rounded-sm shadow-sm" 
+          alt="BGR Flag" 
+          crossOrigin="anonymous"
+        />
         <div className="flex flex-col items-center -mt-1">
           <div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center">
             <img 
               src={assets.police_logo || "https://picsum.photos/seed/logo/120/120"} 
-              className="w-full h-full object-contain mix-blend-multiply" 
+              className="w-full h-full object-contain" 
+              style={{ opacity: 0.9 }}
               alt="Police Logo" 
+              crossOrigin="anonymous"
             />
           </div>
         </div>
-        <img src={assets.eth_flag || "https://picsum.photos/seed/eth/100/60"} className="h-7 w-13 object-cover rounded-sm shadow-sm" alt="ETH Flag" />
+        <img 
+          src={assets.eth_flag || "https://picsum.photos/seed/eth/100/60"} 
+          className="h-7 w-12 object-cover rounded-sm shadow-sm" 
+          alt="ETH Flag" 
+          crossOrigin="anonymous"
+        />
       </div>
 
       {/* Commission Name */}
@@ -130,6 +142,7 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
                 src={data.photo_url} 
                 className="w-full h-full object-contain bg-slate-50" 
                 alt="Member" 
+                crossOrigin="anonymous"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center text-amber-200">
@@ -164,7 +177,12 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
     >
       {/* Watermark */}
       <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
-        <img src={assets.police_logo || "https://picsum.photos/seed/logo/200/200"} className="w-64 h-64 object-contain mix-blend-multiply" alt="Watermark" />
+        <img 
+          src={assets.police_logo || "https://picsum.photos/seed/logo/200/200"} 
+          className="w-64 h-64 object-contain" 
+          alt="Watermark" 
+          crossOrigin="anonymous"
+        />
       </div>
 
       <div className="relative z-10 flex flex-col h-full">
@@ -242,7 +260,12 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
           <div className="flex flex-col items-center w-[25mm]">
             <div className="h-12 w-full flex items-center justify-center relative">
               {data.commissioner_signature ? (
-                <img src={data.commissioner_signature} className="h-full w-full object-contain mix-blend-multiply" alt="Signature" />
+                <img 
+                  src={data.commissioner_signature} 
+                  className="h-full w-full object-contain" 
+                  alt="Signature" 
+                  crossOrigin="anonymous"
+                />
               ) : (
                 <div className="w-full border-b mb-1" style={{ borderBottomColor: '#cbd5e1' }}></div>
               )}
@@ -573,6 +596,16 @@ export default function App() {
 
       document.body.appendChild(captureContainer);
 
+      // Explicitly wait for all images in the capture container to load
+      const imagesToLoad = Array.from(captureContainer.querySelectorAll('img'));
+      await Promise.all(imagesToLoad.map(img => {
+        if (img.complete) return Promise.resolve();
+        return new Promise(resolve => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      }));
+
       const canvas = await html2canvas(captureContainer, {
         scale: 2, // Moderate scale for better compatibility
         useCORS: true,
@@ -631,6 +664,7 @@ export default function App() {
       const res = await apiFetch('/api/assets');
       if (!res.ok) throw new Error('Failed to fetch assets');
       const data = await res.json();
+      console.log("Assets fetched successfully:", Object.keys(data));
       setAssets(data);
     } catch (e) {
       console.error("Fetch assets error:", e);
