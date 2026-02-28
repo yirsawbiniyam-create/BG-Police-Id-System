@@ -413,7 +413,7 @@ app.post("/api/ids", authenticateToken, authorizeRole(['Administrator', 'Data En
   }
 });
 
-app.put("/api/ids/:id", authenticateToken, authorizeRole(['Administrator', 'Data Entry']), async (req, res) => {
+app.put("/api/ids/:id", authenticateToken, authorizeRole(['Administrator']), async (req, res) => {
   const { 
     full_name_am, full_name_en, 
     rank_am, rank_en, 
@@ -445,6 +445,18 @@ app.put("/api/ids/:id", authenticateToken, authorizeRole(['Administrator', 'Data
       emergency_contact_name, emergency_contact_phone,
       req.params.id
     );
+    res.json({ success: true });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/api/ids/:id", authenticateToken, authorizeRole(['Administrator']), async (req, res) => {
+  const currentDb = await initDb();
+  if (!currentDb) return res.status(500).json({ error: "Database not available" });
+  
+  try {
+    currentDb.prepare("DELETE FROM ids WHERE id = ?").run(req.params.id);
     res.json({ success: true });
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -562,6 +574,23 @@ app.post("/api/backups/restore", authenticateToken, authorizeRole(['Administrato
   } catch (e: any) {
     // Attempt to re-open if it failed
     await initDb();
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.delete("/api/backups/:filename", authenticateToken, authorizeRole(['Administrator']), async (req, res) => {
+  console.log("DELETE /api/backups hit");
+  const { filename } = req.params;
+  const backupPath = path.join(BACKUP_DIR, filename);
+
+  if (!fs.existsSync(backupPath)) {
+    return res.status(404).json({ error: "Backup file not found" });
+  }
+
+  try {
+    fs.unlinkSync(backupPath);
+    res.json({ success: true });
+  } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
 });

@@ -5,7 +5,7 @@ import {
   Shield, User, Phone, Briefcase, Award, 
   ChevronRight, Languages, Loader2, Camera,
   Eye, X, Check, Database as DbIcon, RefreshCw, HardDrive,
-  ShieldAlert, Edit
+  ShieldAlert, Edit, Trash2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import Barcode from 'react-barcode';
@@ -366,6 +366,23 @@ export default function App() {
     }, 1500);
   };
 
+  const handleDeleteRecord = async (id: number) => {
+    if (!confirm('ይህንን መረጃ በእርግጠኝነት ማጥፋት ይፈልጋሉ? (Are you sure you want to delete this record?)')) return;
+    try {
+      const res = await apiFetch(`/api/ids/${id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (data.success) {
+        fetchRecords();
+        alert('መረጃው በትክክል ጠፍቷል! (Record deleted successfully)');
+      } else {
+        alert(data.error || 'መረጃውን ማጥፋት አልተቻለም (Failed to delete record)');
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert('ስህተት ተፈጥሯል (An error occurred)');
+    }
+  };
+
   const [showScans, setShowScans] = useState(false);
   const [scanHistory, setScanHistory] = useState<any[]>([]);
 
@@ -532,7 +549,26 @@ export default function App() {
     }
   };
 
-  const handleDownload = async (idNumber: string, side: 'front' | 'back' | 'both') => {
+  const deleteBackup = async (filename: string) => {
+    if (!confirm(`ይህንን ባካፕ በእርግጠኝነት ማጥፋት ይፈልጋሉ? (Are you sure you want to delete backup: ${filename}?)`)) return;
+    setLoading(true);
+    try {
+      const res = await apiFetch(`/api/backups/${filename}`, { method: 'DELETE' });
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+      const data = await res.json();
+      if (data.success) {
+        fetchBackups();
+        alert("ባካፕ በትክክል ጠፍቷል (Backup deleted successfully)");
+      }
+    } catch (e) {
+      console.error("Delete backup error:", e);
+      alert("ባካፕ ማጥፋት አልተቻለም (Delete backup failed)");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownload = async (idNumber: string, side: 'front' | 'back' | 'both' | 'combined') => {
     setLoading(true);
     let captureContainer: HTMLDivElement | null = null;
     
@@ -550,7 +586,7 @@ export default function App() {
       captureContainer.style.padding = '40px';
       captureContainer.style.backgroundColor = '#ffffff';
 
-      const sidesToCapture = side === 'both' ? ['front', 'back'] : [side];
+      const sidesToCapture = (side === 'both' || side === 'combined') ? ['front', 'back'] : [side];
       let foundAny = false;
       
       for (const s of sidesToCapture) {
@@ -1113,12 +1149,20 @@ export default function App() {
                               {(backup.size / 1024 / 1024).toFixed(2)} MB
                             </td>
                             <td className="px-8 py-4 text-right">
-                              <button 
-                                onClick={() => restoreBackup(backup.filename)}
-                                className="px-4 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                              >
-                                Restore
-                              </button>
+                              <div className="flex justify-end gap-2">
+                                <button 
+                                  onClick={() => restoreBackup(backup.filename)}
+                                  className="px-4 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                >
+                                  Restore
+                                </button>
+                                <button 
+                                  onClick={() => deleteBackup(backup.filename)}
+                                  className="px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                >
+                                  Delete
+                                </button>
+                              </div>
                             </td>
                           </tr>
                         ))
@@ -1133,10 +1177,10 @@ export default function App() {
                   <Shield size={24} />
                 </div>
                 <div>
-                  <h4 className="font-bold text-amber-900">Automatic Backups</h4>
+                  <h4 className="font-bold text-amber-900">የመረጃ ጥበቃ ፖሊሲ (Data Protection Policy)</h4>
                   <p className="text-sm text-amber-800/80 mt-1">
-                    The system is configured to perform automatic daily backups at 2:00 AM. 
-                    These backups are stored securely on the server and can be restored from the list above.
+                    ሁሉም የባካፕ ፋይሎች በቋሚነት ይቀመጣሉ። ሲስተሙ በራሱ ምንም አይነት መረጃ አያጠፋም። መረጃ ሊጠፋ የሚችለው በአድሚን ፍላጎትና ውሳኔ ብቻ ነው። 
+                    (All backup files are stored permanently. The system does not delete any data automatically. Data can only be deleted by explicit administrator action.)
                   </p>
                 </div>
               </div>
@@ -1211,34 +1255,36 @@ export default function App() {
                         <td className="px-6 py-4 text-sm text-slate-600">{record.phone}</td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button 
-                              onClick={() => {
-                                setFormData({
-                                  id: record.id,
-                                  full_name_am: record.full_name_am,
-                                  full_name_en: record.full_name_en,
-                                  rank_am: record.rank_am,
-                                  rank_en: record.rank_en,
-                                  responsibility_am: record.responsibility_am,
-                                  responsibility_en: record.responsibility_en,
-                                  phone: record.phone,
-                                  photo_url: record.photo_url,
-                                  blood_type: record.blood_type,
-                                  badge_number: record.badge_number,
-                                  gender: record.gender,
-                                  complexion: record.complexion,
-                                  height: record.height,
-                                  emergency_contact_name: record.emergency_contact_name,
-                                  emergency_contact_phone: record.emergency_contact_phone,
-                                  commissioner_signature: record.commissioner_signature
-                                });
-                                setView('create');
-                              }}
-                              className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                              title="Edit Record"
-                            >
-                              <Edit size={18} />
-                            </button>
+                            {user?.role === 'Administrator' && (
+                              <button 
+                                onClick={() => {
+                                  setFormData({
+                                    id: record.id,
+                                    full_name_am: record.full_name_am,
+                                    full_name_en: record.full_name_en,
+                                    rank_am: record.rank_am,
+                                    rank_en: record.rank_en,
+                                    responsibility_am: record.responsibility_am,
+                                    responsibility_en: record.responsibility_en,
+                                    phone: record.phone,
+                                    photo_url: record.photo_url,
+                                    blood_type: record.blood_type,
+                                    badge_number: record.badge_number,
+                                    gender: record.gender,
+                                    complexion: record.complexion,
+                                    height: record.height,
+                                    emergency_contact_name: record.emergency_contact_name,
+                                    emergency_contact_phone: record.emergency_contact_phone,
+                                    commissioner_signature: record.commissioner_signature
+                                  });
+                                  setView('create');
+                                }}
+                                className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                                title="Edit Record"
+                              >
+                                <Edit size={18} />
+                              </button>
+                            )}
                             <button 
                               onClick={() => fetchScans(record.id_number)}
                               className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
@@ -1261,9 +1307,19 @@ export default function App() {
                                 handlePrintSide('both');
                               }}
                               className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                              title="Print ID"
                             >
                               <Printer size={18} />
                             </button>
+                            {user?.role === 'Administrator' && (
+                              <button 
+                                onClick={() => handleDeleteRecord(record.id)}
+                                className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                title="Delete Record"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1312,6 +1368,7 @@ export default function App() {
                 setView('create');
               }
             }}
+            userRole={user?.role}
           />
         )}
       </AnimatePresence>
@@ -1428,7 +1485,7 @@ export default function App() {
 
 // --- Helper Components ---
 
-function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit }: { record: IDRecord, assets: Assets, onClose: () => void, onPrint: (side: 'front' | 'back' | 'both' | 'combined') => void, onDownload: (side: 'front' | 'back' | 'both' | 'combined') => void, onEdit: () => void }) {
+function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, userRole }: { record: IDRecord, assets: Assets, onClose: () => void, onPrint: (side: 'front' | 'back' | 'both' | 'combined') => void, onDownload: (side: 'front' | 'back' | 'both' | 'combined') => void, onEdit: () => void, userRole?: string }) {
   const [activeTab, setActiveTab] = useState<'front' | 'back' | 'both' | 'combined'>('both');
 
   return (
@@ -1556,13 +1613,15 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit }: 
 
         <div className="p-8 bg-white border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex gap-2">
-            <button 
-              onClick={onEdit}
-              className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all flex items-center gap-2"
-            >
-              <Edit size={18} />
-              Edit
-            </button>
+            {userRole === 'Administrator' && (
+              <button 
+                onClick={onEdit}
+                className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all flex items-center gap-2"
+              >
+                <Edit size={18} />
+                Edit
+              </button>
+            )}
             <button 
               onClick={onClose}
               className="w-full sm:w-auto px-8 py-3 rounded-2xl font-bold text-slate-600 hover:bg-slate-100 transition-all"
