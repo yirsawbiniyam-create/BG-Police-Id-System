@@ -1802,32 +1802,41 @@ function UserManagement({ apiFetch }: { apiFetch: (u: string, o?: any) => Promis
   );
 }
 
-function VerificationView({ idNumber, assets }: { idNumber: string, assets: Assets }) {
+function VerificationView({ idNumber, assets: initialAssets }: { idNumber: string, assets: Assets }) {
   const [record, setRecord] = useState<IDRecord | null>(null);
+  const [assets, setAssets] = useState<Assets>(initialAssets);
   const [loading, setLoading] = useState(true);
   const [flipped, setFlipped] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/ids/${idNumber}`)
-      .then(async res => {
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const contentType = res.headers.get("content-type");
-        if (contentType && contentType.indexOf("application/json") !== -1) {
-          return res.json();
-        } else {
-          throw new Error("Server returned non-JSON response");
+    const fetchData = async () => {
+      try {
+        // Fetch record if not already loaded or if idNumber changed
+        if (!record || record.id_number !== idNumber) {
+          const recordRes = await fetch(`/api/ids/${idNumber}`);
+          if (!recordRes.ok) throw new Error(`HTTP error! status: ${recordRes.status}`);
+          const recordData = await recordRes.json();
+          setRecord(recordData);
         }
-      })
-      .then(data => {
-        setRecord(data);
-        setLoading(false);
-      })
-      .catch(err => {
+
+        // Fetch assets if they are empty
+        if (Object.keys(assets).length === 0) {
+          const assetsRes = await fetch('/api/assets');
+          if (assetsRes.ok) {
+            const assetsData = await assetsRes.json();
+            setAssets(assetsData);
+          }
+        }
+      } catch (err) {
         console.error("Verification fetch error:", err);
         setRecord(null);
+      } finally {
         setLoading(false);
-      });
-  }, [idNumber]);
+      }
+    };
+
+    fetchData();
+  }, [idNumber]); // Only depend on idNumber
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">

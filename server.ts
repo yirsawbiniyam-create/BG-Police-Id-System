@@ -438,8 +438,8 @@ app.get("/api/scans/:id_number", authenticateToken, async (req, res) => {
 });
 
 // Assets (Flags/Logo)
-app.get("/api/assets", authenticateToken, async (req, res) => {
-  console.log("GET /api/assets hit");
+app.get("/api/assets", async (req, res) => {
+  console.log("GET /api/assets hit (public)");
   const currentDb = await initDb();
   if (!currentDb) return res.status(500).json({ error: "Database not available" });
   const rows = currentDb.prepare("SELECT * FROM assets").all();
