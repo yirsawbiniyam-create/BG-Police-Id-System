@@ -252,11 +252,25 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // New API: Create ID with the user's requested schema
 app.post("/api/id/create", async (req, res) => {
   const cardCode = `BG-${Date.now()}`;
+  const currentDb = await initDb();
+  if (!currentDb) return res.status(500).json({ error: "Database not available" });
+
   try {
-    await IdCard.create({
-      cardCode,
-      ...req.body
-    });
+    if (useMongoDB) {
+      await IdCard.create({
+        cardCode,
+        ...req.body
+      });
+    } else {
+      // For SQLite fallback, we'll store it in the 'ids' table but map the fields
+      // or we can create a separate table. To keep it simple, let's use the 'ids' table
+      // and store the cardCode in the id_number field.
+      const stmt = currentDb.prepare(`
+        INSERT INTO ids (id_number, full_name_en, rank_en, badge_number, phone, status)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+      stmt.run(cardCode, req.body.fullNameEn, req.body.rankEn, req.body.badgeNumber, req.body.phone, "active");
+    }
     res.json({
       cardCode,
       verifyUrl: `/verify/${cardCode}`
@@ -268,24 +282,51 @@ app.post("/api/id/create", async (req, res) => {
 
 // New API: Verify ID with the user's requested schema (returns HTML)
 app.get("/verify/:cardCode", async (req, res) => {
+  const currentDb = await initDb();
+  if (!currentDb) return res.status(500).send("❌ DATABASE ERROR");
+
   try {
-    const card = await IdCard.findOne({ cardCode: req.params.cardCode });
-    if (!card) {
-      return res.send("❌ INVALID CARD");
+    let card;
+    if (useMongoDB) {
+      card = await IdCard.findOne({ cardCode: req.params.cardCode });
+    } else {
+      // SQLite fallback: search in 'ids' table where id_number matches cardCode
+      card = currentDb.prepare("SELECT * FROM ids WHERE id_number = ?").get(req.params.cardCode);
+      if (card) {
+        // Map SQLite fields to match the expected object structure
+        card = {
+          fullNameEn: card.full_name_en,
+          rankEn: card.rank_en,
+          badgeNumber: card.badge_number,
+          status: card.status || "active",
+          createdAt: card.created_at
+        };
+      }
     }
+
+    if (!card) {
+      return res.send(`
+        <div style="font-family: sans-serif; padding: 20px; text-align: center; border: 2px solid #ff0000; border-radius: 10px; max-width: 400px; margin: 20px auto;">
+          <h1 style="color: #ff0000;">❌ INVALID CARD</h1>
+          <p>This ID card could not be found in our records.</p>
+        </div>
+      `);
+    }
+
     res.send(`
       <div style="font-family: sans-serif; padding: 20px; text-align: center; border: 2px solid #000; border-radius: 10px; max-width: 400px; margin: 20px auto;">
         <h1 style="color: #008000;">✅ VALID POLICE ID</h1>
         <hr/>
-        <p><strong>Name:</strong> ${card.fullNameEn}</p>
-        <p><strong>Rank:</strong> ${card.rankEn}</p>
-        <p><strong>Badge:</strong> ${card.badgeNumber}</p>
-        <p><strong>Status:</strong> <span style="color: #008000; font-weight: bold;">${card.status}</span></p>
-        <p><strong>Created:</strong> ${new Date(card.createdAt as any).toLocaleDateString()}</p>
+        <p><strong>Name:</strong> ${card.fullNameEn || "N/A"}</p>
+        <p><strong>Rank:</strong> ${card.rankEn || "N/A"}</p>
+        <p><strong>Badge:</strong> ${card.badgeNumber || "N/A"}</p>
+        <p><strong>Status:</strong> <span style="color: #008000; font-weight: bold;">${card.status || "active"}</span></p>
+        <p><strong>Verification Date:</strong> ${new Date().toLocaleString()}</p>
       </div>
     `);
   } catch (e: any) {
-    res.status(500).send("❌ ERROR VERIFYING CARD");
+    console.error("Verification error:", e);
+    res.status(500).send("❌ ERROR VERIFYING CARD: " + e.message);
   }
 });
 app.use((req, res, next) => {
