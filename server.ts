@@ -1,4 +1,8 @@
-import express from "express";
+import mongoose from "mongoose";
+
+mongoose.connect(process.env.MONGODB_URI)
+  .then(() => console.log("MongoDB Connected"))
+  .catch(err => console.error(err));import express from "express";
 import { createServer as createViteServer } from "vite";
 // import Database from "better-sqlite3"; // Moved to dynamic import
 console.log("Server script starting...");
