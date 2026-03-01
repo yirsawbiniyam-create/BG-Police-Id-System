@@ -49,6 +49,39 @@ interface Assets {
   police_logo?: string;
 }
 
+// --- Helper Functions ---
+
+const resizeImage = (base64Str: string, maxWidth = 800, maxHeight = 800): Promise<string> => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.src = base64Str;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let width = img.width;
+      let height = img.height;
+
+      if (width > height) {
+        if (width > maxWidth) {
+          height *= maxWidth / width;
+          width = maxWidth;
+        }
+      } else {
+        if (height > maxHeight) {
+          width *= maxHeight / height;
+          height = maxHeight;
+        }
+      }
+
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.7));
+    };
+    img.onerror = () => resolve(base64Str);
+  });
+};
+
 // --- Components ---
 
 const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, assets: Assets }>(({ data, assets }, ref) => {
@@ -316,25 +349,44 @@ export default function App() {
     emergency_contact_name: string;
     emergency_contact_phone: string;
     commissioner_signature: string;
-  }>({
-    id: null,
-    full_name_am: '',
-    full_name_en: '',
-    rank_am: '',
-    rank_en: '',
-    responsibility_am: '',
-    responsibility_en: '',
-    phone: '',
-    photo_url: '',
-    blood_type: '',
-    badge_number: '',
-    gender: '',
-    complexion: '',
-    height: '',
-    emergency_contact_name: '',
-    emergency_contact_phone: '',
-    commissioner_signature: ''
+  }>(() => {
+    const savedDraft = localStorage.getItem('id_form_draft');
+    if (savedDraft) {
+      try {
+        return JSON.parse(savedDraft);
+      } catch (e) {
+        console.error("Failed to parse form draft:", e);
+      }
+    }
+    return {
+      id: null,
+      full_name_am: '',
+      full_name_en: '',
+      rank_am: '',
+      rank_en: '',
+      responsibility_am: '',
+      responsibility_en: '',
+      phone: '',
+      photo_url: '',
+      blood_type: '',
+      badge_number: '',
+      gender: '',
+      complexion: '',
+      height: '',
+      emergency_contact_name: '',
+      emergency_contact_phone: '',
+      commissioner_signature: ''
+    };
   });
+
+  // Auto-save draft
+  useEffect(() => {
+    if (formData.full_name_am || formData.full_name_en || formData.phone || formData.photo_url) {
+      localStorage.setItem('id_form_draft', JSON.stringify(formData));
+    } else {
+      localStorage.removeItem('id_form_draft');
+    }
+  }, [formData]);
 
   const [printSide, setPrintSide] = useState<'front' | 'back' | 'both' | 'combined'>('both');
   const printRef = useRef<HTMLDivElement>(null);
@@ -745,7 +797,13 @@ export default function App() {
     if (!file) return;
     const reader = new FileReader();
     reader.onloadend = async () => {
-      const base64 = reader.result as string;
+      let base64 = reader.result as string;
+      
+      // Resize assets to keep them small
+      if (base64.startsWith('data:image')) {
+        base64 = await resizeImage(base64, 400, 400);
+      }
+
       try {
         const res = await apiFetch('/api/assets', {
           method: 'POST',
@@ -771,8 +829,9 @@ export default function App() {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onloadend = () => {
-      setFormData({ ...formData, photo_url: reader.result as string });
+    reader.onloadend = async () => {
+      const base64 = await resizeImage(reader.result as string, 600, 800);
+      setFormData({ ...formData, photo_url: base64 });
     };
     reader.readAsDataURL(file);
   };
@@ -813,7 +872,7 @@ export default function App() {
       const result = await res.json();
       if (result.success) {
         fetchRecords();
-        setFormData({
+        const emptyForm = {
           id: null,
           full_name_am: '', full_name_en: '',
           rank_am: '', rank_en: '',
@@ -823,7 +882,9 @@ export default function App() {
           gender: '', complexion: '', height: '',
           emergency_contact_name: '', emergency_contact_phone: '',
           commissioner_signature: ''
-        });
+        };
+        setFormData(emptyForm);
+        localStorage.removeItem('id_form_draft');
         setView('history');
         alert(isUpdate ? "መረጃው በትክክል ተሻሽሏል!" : "መታወቂያው በትክክል ተመዝግቧል!");
       }
@@ -869,17 +930,22 @@ export default function App() {
                 <NavButton 
                   active={view === 'create'} 
                   onClick={() => {
-                    setFormData({
-                      id: null,
-                      full_name_am: '', full_name_en: '',
-                      rank_am: '', rank_en: '',
-                      responsibility_am: '', responsibility_en: '',
-                      phone: '', photo_url: '',
-                      blood_type: '', badge_number: '',
-                      gender: '', complexion: '', height: '',
-                      emergency_contact_name: '', emergency_contact_phone: '',
-                      commissioner_signature: ''
-                    });
+                    const hasData = formData.full_name_am || formData.full_name_en || formData.phone || formData.photo_url;
+                    if (hasData && !formData.id && view !== 'create') {
+                      if (confirm('ያልተቀመጠ መረጃ አለ። አዲስ መመዝገብ ይፈልጋሉ? (You have unsaved data. Do you want to start a new registration?)')) {
+                        setFormData({
+                          id: null,
+                          full_name_am: '', full_name_en: '',
+                          rank_am: '', rank_en: '',
+                          responsibility_am: '', responsibility_en: '',
+                          phone: '', photo_url: '',
+                          blood_type: '', badge_number: '',
+                          gender: '', complexion: '', height: '',
+                          emergency_contact_name: '', emergency_contact_phone: '',
+                          commissioner_signature: ''
+                        });
+                      }
+                    }
                     setView('create');
                   }} 
                   icon={<Plus size={18} />} 
@@ -982,7 +1048,38 @@ export default function App() {
                   <div>
                     <h2 className="text-2xl font-bold">{formData.id ? 'Edit Member ID' : 'Create New Member ID'}</h2>
                     <p className="text-blue-100 text-sm">{formData.id ? 'Update member details' : 'Fill in the details. Missing translations will be generated automatically.'}</p>
+                    {localStorage.getItem('id_form_draft') && !formData.id && (
+                      <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-500/30 rounded-full text-[10px] font-bold uppercase tracking-wider">
+                        <DbIcon size={12} />
+                        Draft Loaded from Storage
+                      </div>
+                    )}
                   </div>
+                  {(!formData.id && (formData.full_name_am || formData.full_name_en || formData.phone || formData.photo_url)) && (
+                    <button 
+                      type="button"
+                      onClick={() => {
+                        if (confirm('ፎርሙን ማጽዳት ይፈልጋሉ? (Are you sure you want to clear the form?)')) {
+                          setFormData({
+                            id: null,
+                            full_name_am: '', full_name_en: '',
+                            rank_am: '', rank_en: '',
+                            responsibility_am: '', responsibility_en: '',
+                            phone: '', photo_url: '',
+                            blood_type: '', badge_number: '',
+                            gender: '', complexion: '', height: '',
+                            emergency_contact_name: '', emergency_contact_phone: '',
+                            commissioner_signature: ''
+                          });
+                          localStorage.removeItem('id_form_draft');
+                        }
+                      }}
+                      className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                    >
+                      <Trash2 size={14} />
+                      Clear Form
+                    </button>
+                  )}
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-8 space-y-6">
@@ -1062,7 +1159,10 @@ export default function App() {
                               const file = e.target.files?.[0];
                               if (!file) return;
                               const reader = new FileReader();
-                              reader.onloadend = () => setFormData({ ...formData, commissioner_signature: reader.result as string });
+                              reader.onloadend = async () => {
+                                const base64 = await resizeImage(reader.result as string, 400, 200);
+                                setFormData({ ...formData, commissioner_signature: base64 });
+                              };
                               reader.readAsDataURL(file);
                             }}
                           />

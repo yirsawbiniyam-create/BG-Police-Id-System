@@ -295,8 +295,8 @@ app.post("/api/id/create", async (req, res) => {
 
   try {
     if (useSupabase) {
-      await supabase.from('id_cards').insert([{
-        card_code: cardCode,
+      await supabase.from('ids').insert([{
+        id_number: cardCode,
         full_name_am: req.body.fullNameAm,
         full_name_en: req.body.fullNameEn,
         rank_am: req.body.rankAm,
@@ -308,23 +308,34 @@ app.post("/api/id/create", async (req, res) => {
         gender: req.body.gender,
         height: req.body.height,
         phone: req.body.phone,
-        emergency_contact: req.body.emergencyContact,
-        status: "active"
+        emergency_contact_name: req.body.emergencyContact?.name,
+        emergency_contact_phone: req.body.emergencyContact?.phone
       }]);
     } else if (useMongoDB) {
-      await IdCard.create({
-        cardCode,
-        ...req.body
+      await ID.create({
+        id_number: cardCode,
+        full_name_am: req.body.fullNameAm,
+        full_name_en: req.body.fullNameEn,
+        rank_am: req.body.rankAm,
+        rank_en: req.body.rankEn,
+        responsibility_am: req.body.responsibilityAm,
+        responsibility_en: req.body.responsibilityEn,
+        badge_number: req.body.badgeNumber,
+        blood_type: req.body.bloodType,
+        gender: req.body.gender,
+        height: req.body.height,
+        phone: req.body.phone,
+        emergency_contact_name: req.body.emergencyContact?.name,
+        emergency_contact_phone: req.body.emergencyContact?.phone
       });
     } else {
-      // For SQLite fallback, we'll store it in the 'ids' table but map the fields
-      // or we can create a separate table. To keep it simple, let's use the 'ids' table
-      // and store the cardCode in the id_number field.
       const stmt = currentDb.prepare(`
-        INSERT INTO ids (id_number, full_name_en, rank_en, badge_number, phone, status)
-        VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO ids (id_number, full_name_am, full_name_en, rank_am, rank_en, responsibility_am, responsibility_en, badge_number, blood_type, gender, height, phone, emergency_contact_name, emergency_contact_phone)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `);
-      stmt.run(cardCode, req.body.fullNameEn, req.body.rankEn, req.body.badgeNumber, req.body.phone, "active");
+      stmt.run(
+        cardCode, req.body.fullNameAm, req.body.fullNameEn, req.body.rankAm, req.body.rankEn, req.body.responsibilityAm, req.body.responsibilityEn, req.body.badgeNumber, req.body.bloodType, req.body.gender, req.body.height, req.body.phone, req.body.emergencyContact?.name, req.body.emergencyContact?.phone
+      );
     }
     res.json({
       cardCode,
@@ -341,31 +352,39 @@ app.get("/verify/:cardCode", async (req, res) => {
   if (!currentDb) return res.status(500).send("❌ DATABASE ERROR");
 
   try {
-    let card;
+    let card: any;
     if (useSupabase) {
-      const { data, error } = await supabase.from('id_cards').select('*').eq('card_code', req.params.cardCode).single();
+      const { data, error } = await supabase.from('ids').select('*').eq('id_number', req.params.cardCode).single();
       if (data) {
         card = {
           fullNameEn: data.full_name_en,
           rankEn: data.rank_en,
           badgeNumber: data.badge_number,
-          status: data.status || "active",
+          status: "Verified",
           createdAt: data.created_at
         };
       }
     } else if (useMongoDB) {
-      card = await IdCard.findOne({ cardCode: req.params.cardCode });
+      const data = await ID.findOne({ id_number: req.params.cardCode });
+      if (data) {
+        card = {
+          fullNameEn: data.full_name_en,
+          rankEn: data.rank_en,
+          badgeNumber: data.badge_number,
+          status: "Verified",
+          createdAt: data.created_at
+        };
+      }
     } else {
       // SQLite fallback: search in 'ids' table where id_number matches cardCode
-      card = currentDb.prepare("SELECT * FROM ids WHERE id_number = ?").get(req.params.cardCode);
-      if (card) {
-        // Map SQLite fields to match the expected object structure
+      const data = currentDb.prepare("SELECT * FROM ids WHERE id_number = ?").get(req.params.cardCode);
+      if (data) {
         card = {
-          fullNameEn: card.full_name_en,
-          rankEn: card.rank_en,
-          badgeNumber: card.badge_number,
-          status: card.status || "active",
-          createdAt: card.created_at
+          fullNameEn: data.full_name_en,
+          rankEn: data.rank_en,
+          badgeNumber: data.badge_number,
+          status: "Verified",
+          createdAt: data.created_at
         };
       }
     }
@@ -688,25 +707,38 @@ app.post("/api/ids", authenticateToken, authorizeRole(['Administrator', 'Data En
     height, emergency_contact_name, emergency_contact_phone
   } = req.body;
 
+  console.log(`[ID_CREATE] Attempting to create ID for: ${full_name_am} / ${full_name_en}`);
+
   const currentDb = await initDb();
-  if (!currentDb) return res.status(500).json({ error: "Database not available" });
+  if (!currentDb) {
+    console.error("[ID_CREATE] Database not available");
+    return res.status(500).json({ error: "Database not available" });
+  }
 
   let id_number;
-  if (useSupabase) {
-    const { count } = await supabase.from('ids').select('*', { count: 'exact', head: true });
-    id_number = `BGR-POL-${String((count || 0) + 1).padStart(5, '0')}`;
-    const { data, error } = await supabase.from('ids').insert([{
-      id_number, full_name_am, full_name_en, rank_am, rank_en, 
-      responsibility_am, responsibility_en, phone, photo_url, commissioner_signature,
-      blood_type, badge_number, gender, complexion, height, 
-      emergency_contact_name, emergency_contact_phone
-    }]).select().single();
-    if (error) return res.status(500).json({ error: error.message });
-    res.json({ success: true, id_number, id: data.id });
-  } else if (useMongoDB) {
-    const count = await ID.countDocuments();
-    id_number = `BGR-POL-${String(count + 1).padStart(5, '0')}`;
-    try {
+  try {
+    if (useSupabase) {
+      console.log("[ID_CREATE] Using Supabase");
+      const { count } = await supabase.from('ids').select('*', { count: 'exact', head: true });
+      id_number = `BGR-POL-${String((count || 0) + 1).padStart(5, '0')}`;
+      console.log(`[ID_CREATE] Generated ID Number: ${id_number}`);
+      
+      const { data, error } = await supabase.from('ids').insert([{
+        id_number, full_name_am, full_name_en, rank_am, rank_en, 
+        responsibility_am, responsibility_en, phone, photo_url, commissioner_signature,
+        blood_type, badge_number, gender, complexion, height, 
+        emergency_contact_name, emergency_contact_phone
+      }]).select().single();
+      
+      if (error) {
+        console.error("[ID_CREATE] Supabase Insert Error:", error);
+        return res.status(500).json({ error: error.message });
+      }
+      console.log("[ID_CREATE] Supabase Insert Success");
+      res.json({ success: true, id_number, id: data.id });
+    } else if (useMongoDB) {
+      const count = await ID.countDocuments();
+      id_number = `BGR-POL-${String(count + 1).padStart(5, '0')}`;
       const newId = await ID.create({
         id_number, full_name_am, full_name_en, rank_am, rank_en, 
         responsibility_am, responsibility_en, phone, photo_url, commissioner_signature,
@@ -714,26 +746,22 @@ app.post("/api/ids", authenticateToken, authorizeRole(['Administrator', 'Data En
         emergency_contact_name, emergency_contact_phone
       });
       res.json({ success: true, id_number, id: newId._id });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
-    }
-  } else {
-    // Generate ID Number: BGR-POL-XXXXX
-    const lastId = currentDb.prepare("SELECT id FROM ids ORDER BY id DESC LIMIT 1").get();
-    const nextId = (lastId?.id || 0) + 1;
-    id_number = `BGR-POL-${String(nextId).padStart(5, '0')}`;
+    } else {
+      // Generate ID Number: BGR-POL-XXXXX
+      const lastId = currentDb.prepare("SELECT id FROM ids ORDER BY id DESC LIMIT 1").get();
+      const nextId = (lastId?.id || 0) + 1;
+      id_number = `BGR-POL-${String(nextId).padStart(5, '0')}`;
 
-    const stmt = currentDb.prepare(`
-      INSERT INTO ids (
-        id_number, full_name_am, full_name_en, rank_am, rank_en, 
-        responsibility_am, responsibility_en, phone, photo_url, commissioner_signature,
-        blood_type, badge_number, gender, complexion, height, 
-        emergency_contact_name, emergency_contact_phone
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `);
-    
-    try {
+      const stmt = currentDb.prepare(`
+        INSERT INTO ids (
+          id_number, full_name_am, full_name_en, rank_am, rank_en, 
+          responsibility_am, responsibility_en, phone, photo_url, commissioner_signature,
+          blood_type, badge_number, gender, complexion, height, 
+          emergency_contact_name, emergency_contact_phone
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `);
+      
       stmt.run(
         id_number, full_name_am, full_name_en, rank_am, rank_en, 
         responsibility_am, responsibility_en, phone, photo_url, commissioner_signature,
@@ -741,9 +769,10 @@ app.post("/api/ids", authenticateToken, authorizeRole(['Administrator', 'Data En
         emergency_contact_name, emergency_contact_phone
       );
       res.json({ success: true, id_number });
-    } catch (e: any) {
-      res.status(500).json({ error: e.message });
     }
+  } catch (e: any) {
+    console.error("[ID_CREATE] Error:", e);
+    res.status(500).json({ error: e.message });
   }
 });
 
