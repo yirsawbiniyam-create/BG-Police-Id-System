@@ -7,6 +7,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import cors from "cors";
 import mongoose from "mongoose";
+import IdCard from "./src/models/IdCard";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const JWT_SECRET = process.env.JWT_SECRET || "police-id-secret-key-2026";
@@ -247,6 +248,46 @@ app.use(cors()); // Simple CORS as suggested by user
 app.options("*", cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+
+// New API: Create ID with the user's requested schema
+app.post("/api/id/create", async (req, res) => {
+  const cardCode = `BG-${Date.now()}`;
+  try {
+    await IdCard.create({
+      cardCode,
+      ...req.body
+    });
+    res.json({
+      cardCode,
+      verifyUrl: `/verify/${cardCode}`
+    });
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// New API: Verify ID with the user's requested schema (returns HTML)
+app.get("/verify/:cardCode", async (req, res) => {
+  try {
+    const card = await IdCard.findOne({ cardCode: req.params.cardCode });
+    if (!card) {
+      return res.send("❌ INVALID CARD");
+    }
+    res.send(`
+      <div style="font-family: sans-serif; padding: 20px; text-align: center; border: 2px solid #000; border-radius: 10px; max-width: 400px; margin: 20px auto;">
+        <h1 style="color: #008000;">✅ VALID POLICE ID</h1>
+        <hr/>
+        <p><strong>Name:</strong> ${card.fullNameEn}</p>
+        <p><strong>Rank:</strong> ${card.rankEn}</p>
+        <p><strong>Badge:</strong> ${card.badgeNumber}</p>
+        <p><strong>Status:</strong> <span style="color: #008000; font-weight: bold;">${card.status}</span></p>
+        <p><strong>Created:</strong> ${new Date(card.createdAt as any).toLocaleDateString()}</p>
+      </div>
+    `);
+  } catch (e: any) {
+    res.status(500).send("❌ ERROR VERIFYING CARD");
+  }
+});
 app.use((req, res, next) => {
   console.log(`[${new Date().toISOString()}] ${req.method} ${req.url} - Path: ${req.path}`);
   next();
