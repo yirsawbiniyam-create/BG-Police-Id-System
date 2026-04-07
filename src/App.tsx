@@ -558,6 +558,8 @@ export default function App() {
       let msg = e.message;
       if (e.code === 'auth/network-request-failed') {
         msg = "Network error. Please ensure your domain is authorized in Firebase Console: " + window.location.hostname;
+      } else if (e.code === 'auth/operation-not-allowed') {
+        msg = "Login method not enabled. Please enable 'Email/Password' and 'Anonymous' sign-in in the Firebase Console (Authentication > Sign-in method).";
       }
       alert('Login error: ' + msg);
     } finally {
