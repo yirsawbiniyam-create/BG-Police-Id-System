@@ -1016,26 +1016,42 @@ export default function App() {
               className="space-y-8"
             >
               {/* Main Dashboard Header */}
-              <div className="flex flex-col items-center justify-center text-center space-y-4 mb-12">
-                <div className="flex items-center gap-4 md:gap-8">
-                  <img 
-                    src="https://upload.wikimedia.org/wikipedia/commons/7/71/Flag_of_Ethiopia.svg" 
-                    alt="Ethiopian Flag" 
-                    className="w-12 h-8 md:w-20 md:h-12 object-cover rounded shadow-md border border-slate-200"
-                    referrerPolicy="no-referrer"
-                  />
-                  <h2 className="text-2xl md:text-4xl font-black bg-gradient-to-b from-[#FFD700] via-[#D4AF37] to-[#B8860B] bg-clip-text text-transparent drop-shadow-md tracking-tight leading-tight">
-                    የቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን <br />
-                    የፖሊስ መታወቂያ ካርድ ሲስተም
-                  </h2>
-                  <img 
-                    src="https://upload.wikimedia.org/wikipedia/commons/7/71/Flag_of_Ethiopia.svg" 
-                    alt="Ethiopian Flag" 
-                    className="w-12 h-8 md:w-20 md:h-12 object-cover rounded shadow-md border border-slate-200"
-                    referrerPolicy="no-referrer"
-                  />
+              <div className="flex flex-col items-center justify-center text-center space-y-6 mb-16">
+                <div className="relative group">
+                  <div className="absolute -inset-4 bg-gradient-to-r from-[#009a44] via-[#fedd00] to-[#ef3340] rounded-full blur-xl opacity-20 group-hover:opacity-40 transition-opacity duration-500" />
+                  <div className="relative w-24 h-24 md:w-32 md:h-32 bg-white rounded-full shadow-2xl flex items-center justify-center border-4 border-[#D4AF37] overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-tr from-slate-50 to-white" />
+                    <div className="absolute top-0 left-0 w-full h-1.5 flex">
+                      <div className="flex-1 bg-[#009a44]" />
+                      <div className="flex-1 bg-[#fedd00]" />
+                      <div className="flex-1 bg-[#ef3340]" />
+                    </div>
+                    <Shield size={64} className="text-[#1e293b] relative z-10 drop-shadow-lg" />
+                    <div className="absolute bottom-2 font-black text-[8px] text-[#D4AF37] tracking-widest uppercase z-10">
+                      BGR POLICE
+                    </div>
+                  </div>
                 </div>
-                <div className="h-1 w-48 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent rounded-full opacity-60" />
+
+                <div className="space-y-2">
+                  <h2 className="text-3xl md:text-5xl font-black bg-gradient-to-b from-[#FFD700] via-[#D4AF37] to-[#B8860B] bg-clip-text text-transparent drop-shadow-xl tracking-tighter leading-tight">
+                    ቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን <br />
+                    የመታወቂያ ሲስተም
+                  </h2>
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="h-[1px] w-12 bg-slate-200" />
+                    <h3 className="text-lg md:text-xl font-bold text-slate-800 tracking-wide uppercase">
+                      BGR Police Commission ID System
+                    </h3>
+                    <div className="h-[1px] w-12 bg-slate-200" />
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-1 bg-[#009a44] rounded-full" />
+                  <div className="w-8 h-1 bg-[#fedd00] rounded-full" />
+                  <div className="w-8 h-1 bg-[#ef3340] rounded-full" />
+                </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -1852,16 +1868,33 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden"
       >
-        <div className="p-10 bg-blue-600 text-white text-center relative overflow-hidden">
+        <div className="p-10 bg-slate-900 text-white text-center relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-1.5 flex">
             <div className="flex-1 bg-[#009a44]" />
             <div className="flex-1 bg-[#fedd00]" />
             <div className="flex-1 bg-[#ef3340]" />
           </div>
-          <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <Shield size={32} />
+          
+          {/* Professional Decorated Logo */}
+          <div className="relative w-20 h-20 bg-white rounded-full shadow-2xl flex items-center justify-center mx-auto mb-6 border-2 border-[#D4AF37] overflow-hidden">
+            <div className="absolute inset-0 bg-gradient-to-tr from-slate-50 to-white" />
+            <div className="absolute top-0 left-0 w-full h-1 flex">
+              <div className="flex-1 bg-[#009a44]" />
+              <div className="flex-1 bg-[#fedd00]" />
+              <div className="flex-1 bg-[#ef3340]" />
+            </div>
+            <Shield size={40} className="text-slate-900 relative z-10 drop-shadow-md" />
           </div>
-          <h2 className="text-2xl font-bold">BGR Police Commission</h2>
+
+          <div className="space-y-2">
+            <h2 className="text-xl md:text-2xl font-black bg-gradient-to-b from-[#FFD700] via-[#D4AF37] to-[#B8860B] bg-clip-text text-transparent leading-tight">
+              ቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን <br />
+              የመታወቂያ ሲስተም
+            </h2>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+              BGR Police Commission ID System
+            </p>
+          </div>
         </div>
         
         <form onSubmit={handleSubmit} className="p-10 space-y-6">
