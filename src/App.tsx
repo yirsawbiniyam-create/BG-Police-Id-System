@@ -12,7 +12,7 @@ import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
 import { useReactToPrint } from 'react-to-print';
 import { translateText } from './services/gemini';
-import { db, auth, storage } from './lib/firebase';
+import { db, auth } from './lib/firebase';
 import { 
   signInWithEmailAndPassword, 
   onAuthStateChanged, 
@@ -34,7 +34,6 @@ import {
   getDoc,
   limit
 } from 'firebase/firestore';
-import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 // --- Types ---
 
@@ -506,7 +505,11 @@ export default function App() {
   const handleDeleteRecord = async (id: string) => {
     if (!confirm('ይህንን መረጃ በእርግጠኝነት ማጥፋት ይፈልጋሉ? (Are you sure you want to delete this record?)')) return;
     try {
-      await deleteDoc(doc(db, 'ids', id));
+      // Soft delete: update the record with deleted: true instead of deleteDoc
+      await updateDoc(doc(db, 'ids', id), {
+        deleted: true,
+        deleted_at: new Date().toISOString()
+      });
       fetchRecords();
       alert('መረጃው በትክክል ጠፍቷል! (Record deleted successfully)');
     } catch (error: any) {
@@ -782,7 +785,9 @@ export default function App() {
         q = query(collection(db, 'ids'), orderBy('full_name_am', 'asc'));
       }
       const querySnapshot = await getDocs(q);
-      const data = querySnapshot.docs.map(doc => ({ ...(doc.data() as any), id: doc.id })) as any[];
+      const data = querySnapshot.docs
+        .map(doc => ({ ...(doc.data() as any), id: doc.id }))
+        .filter(record => !record.deleted) as any[]; // Filter out soft-deleted records
       setRecords(data);
     } catch (e) {
       console.error("Fetch records error:", e);
@@ -844,30 +849,6 @@ export default function App() {
 
       let photo_url = finalData.photo_url;
       let commissioner_signature = finalData.commissioner_signature;
-
-      if (finalData.photo_url && finalData.photo_url.startsWith('data:image')) {
-        try {
-          const photoRef = ref(storage, `photos/${Date.now()}.jpg`);
-          await uploadString(photoRef, finalData.photo_url, 'data_url');
-          photo_url = await getDownloadURL(photoRef);
-        } catch (uploadErr: any) {
-          console.error("Photo upload failed, using base64 fallback:", uploadErr);
-          // If upload fails (CORS), we use the base64 string directly
-          // This is a fallback so the user can still save the record
-          photo_url = finalData.photo_url;
-        }
-      }
-
-      if (finalData.commissioner_signature && finalData.commissioner_signature.startsWith('data:image')) {
-        try {
-          const sigRef = ref(storage, `signatures/${Date.now()}.png`);
-          await uploadString(sigRef, finalData.commissioner_signature, 'data_url');
-          commissioner_signature = await getDownloadURL(sigRef);
-        } catch (uploadErr: any) {
-          console.error("Signature upload failed, using base64 fallback:", uploadErr);
-          commissioner_signature = finalData.commissioner_signature;
-        }
-      }
 
       const isUpdate = !!finalData.id;
 
@@ -2245,10 +2226,17 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 sm:p-12 select-none">
       <div className="mb-8 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#10b98133] text-emerald-400 rounded-full text-sm font-bold mb-4">
-          <Check size={16} />
-          Verified Official ID / ህጋዊ መታወቂያ
-        </div>
+        {record.deleted ? (
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-red-500/20 text-red-500 rounded-full text-sm font-bold mb-4 border border-red-500/30">
+            <X size={16} />
+            Revoked ID / የተሰረዘ መታወቂያ
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#10b98133] text-emerald-400 rounded-full text-sm font-bold mb-4">
+            <Check size={16} />
+            Verified Official ID / ህጋዊ መታወቂያ
+          </div>
+        )}
         <h1 className="text-white text-xl font-bold">BGR Police Commission</h1>
         <p className="text-slate-400 text-sm">Secure Verification Portal / ደህንነቱ የተጠበቀ ማረጋገጫ</p>
       </div>
@@ -2257,6 +2245,9 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
         <div className="flex flex-col items-center gap-4">
           <div className="scale-110 sm:scale-150 lg:scale-[2.0] origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm]">
             <IDCardFront data={record} assets={assets} />
+          </div>
+          <div className="mt-32 scale-110 sm:scale-150 lg:scale-[2.0] origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm]">
+            <IDCardBack data={record} assets={assets} />
           </div>
         </div>
       </div>
