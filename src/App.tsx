@@ -1,18 +1,3 @@
-// src/App.tsx
-import React from 'react';
-import { useStore } from './store';
-
-export default function App() {
-  const { count, increment, decrement } = useStore();
-
-  return (
-    <div>
-      <h1>Count: {count}</h1>
-      <button onClick={increment}>+</button>
-      <button onClick={decrement}>-</button>
-    </div>
-  );
-}
 import React, { useState, useEffect, useRef } from 'react';
 import html2canvas from 'html2canvas';
 import { 
@@ -289,7 +274,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
           <div className="flex flex-col items-center gap-0.5">
             <div className="p-1.5 bg-white border rounded-lg shadow-md" style={{ borderColor: '#e2e8f0' }}>
               <QRCodeSVG 
-                value={`${window.location.origin}/verify/${data.id_number}`} 
+                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${data.id_number}`} 
                 size={85} 
                 level="H"
               />
@@ -345,6 +330,7 @@ export default function App() {
   const [selectedRecord, setSelectedRecord] = useState<IDRecord | null>(null);
   const [showPreview, setShowPreview] = useState(false);
   const [backups, setBackups] = useState<any[]>([]);
+  const [dbStatus, setDbStatus] = useState<{ isPersistent: boolean; dbType: string; warning: string | null } | null>(null);
 
   const [formData, setFormData] = useState<{
     id: number | null;
@@ -365,12 +351,14 @@ export default function App() {
     emergency_contact_phone: string;
     commissioner_signature: string;
   }>(() => {
-    const savedDraft = localStorage.getItem('id_form_draft');
-    if (savedDraft) {
-      try {
-        return JSON.parse(savedDraft);
-      } catch (e) {
-        console.error("Failed to parse form draft:", e);
+    if (typeof window !== 'undefined') {
+      const savedDraft = localStorage.getItem('id_form_draft');
+      if (savedDraft) {
+        try {
+          return JSON.parse(savedDraft);
+        } catch (e) {
+          console.error("Failed to parse form draft:", e);
+        }
       }
     }
     return {
@@ -393,6 +381,23 @@ export default function App() {
       commissioner_signature: ''
     };
   });
+
+  useEffect(() => {
+    const checkStatus = async () => {
+      try {
+        const res = await fetch('/api/health');
+        const data = await res.json();
+        setDbStatus({
+          isPersistent: data.isPersistent,
+          dbType: data.dbType,
+          warning: data.warning
+        });
+      } catch (e) {
+        console.error("Status check failed:", e);
+      }
+    };
+    checkStatus();
+  }, []);
 
   // Auto-save draft
   useEffect(() => {
@@ -913,18 +918,33 @@ export default function App() {
   };
 
   // Verification View Logic
-  const path = window.location.pathname;
-  if (path.startsWith('/verify/')) {
-    const idNum = path.split('/')[2];
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (isMounted && window.location.pathname.startsWith('/verify/')) {
+    const idNum = window.location.pathname.split('/')[2];
     return <VerificationView idNumber={idNum} assets={assets} />;
   }
 
   if (!token) {
-    return <Login onLogin={handleLogin} loading={loading} serverStatus={serverStatus} />;
+    return <Login onLogin={handleLogin} loading={loading} serverStatus={serverStatus} dbStatus={dbStatus} />;
   }
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-slate-900 font-sans">
+      {/* Database Warning Banner */}
+      {dbStatus && !dbStatus.isPersistent && (
+        <div className="bg-amber-50 border-b border-amber-200 py-2 px-4 flex items-center justify-center gap-3 text-amber-800 text-xs font-medium">
+          <ShieldAlert size={16} className="text-amber-600" />
+          <span>
+            <strong>ማስጠንቀቂያ፦</strong> መረጃዎች በቋሚነት አልተቀመጡም። ሲስተሙ ሲጠፋ መረጃዎች ሊጠፉ ይችላሉ። እባክዎ Supabase ወይም MongoDB ያገናኙ።
+            <span className="ml-2 opacity-75">(Warning: Data is not persistent. Connect Supabase or MongoDB to save permanently.)</span>
+          </span>
+        </div>
+      )}
+
       {/* Navigation */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -991,6 +1011,14 @@ export default function App() {
                 />
               </div>
               <div className="flex items-center gap-2 pl-4 border-l border-slate-200">
+                {dbStatus && (
+                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
+                    dbStatus.isPersistent ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                  }`}>
+                    <DbIcon size={12} />
+                    <span className="hidden lg:inline">{dbStatus.dbType}</span>
+                  </div>
+                )}
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-bold text-slate-900">{user?.username}</p>
                   <p className="text-[10px] text-slate-500 font-medium">{user?.role}</p>
@@ -1231,6 +1259,60 @@ export default function App() {
                 </button>
               </div>
 
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+                    <DbIcon size={20} className="text-blue-600" />
+                    <h3 className="font-bold">Storage Configuration</h3>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-500 font-medium">Database Type</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                        dbStatus?.isPersistent ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        {dbStatus?.dbType || 'Checking...'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-slate-500 font-medium">Persistence</span>
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                        dbStatus?.isPersistent ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
+                      }`}>
+                        {dbStatus?.isPersistent ? 'Permanent' : 'Temporary'}
+                      </span>
+                    </div>
+                    {!dbStatus?.isPersistent && (
+                      <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
+                        <p className="text-[10px] text-amber-800 leading-relaxed">
+                          <strong>ማስጠንቀቂያ፦</strong> ሲስተሙ በአሁኑ ጊዜ መረጃዎችን በጊዜያዊነት (SQLite) እያስቀመጠ ነው። 
+                          Render ላይ ሲስተሙ ሲጠፋ ወይም ሲታደስ መረጃዎች ይጠፋሉ። 
+                          መረጃዎች በቋሚነት እንዲቀመጡ እባክዎ <strong>Supabase</strong> ወይም <strong>MongoDB</strong> ያገናኙ።
+                        </p>
+                        <p className="text-[9px] text-amber-700 mt-2 italic">
+                          (Warning: Currently using temporary SQLite storage. Data will be lost on Render restarts. 
+                          Connect Supabase or MongoDB for permanent storage.)
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="bg-amber-50 border border-amber-100 rounded-[32px] p-6 flex flex-col justify-center gap-4">
+                  <div className="flex gap-4 items-start">
+                    <div className="p-3 bg-amber-100 rounded-2xl text-amber-600">
+                      <Shield size={24} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-amber-900">የመረጃ ጥበቃ ፖሊሲ (Data Protection Policy)</h4>
+                      <p className="text-sm text-amber-800/80 mt-1">
+                        ሁሉም የባካፕ ፋይሎች በቋሚነት ይቀመጣሉ። ሲስተሙ በራሱ ምንም አይነት መረጃ አያጠፋም። መረጃ ሊጠፋ የሚችለው በአድሚን ፍላጎትና ውሳኔ ብቻ ነው። 
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
                 <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
                   <HardDrive size={20} className="text-blue-600" />
@@ -1287,18 +1369,6 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="bg-amber-50 border border-amber-100 rounded-3xl p-6 flex gap-4 items-start">
-                <div className="p-3 bg-amber-100 rounded-2xl text-amber-600">
-                  <Shield size={24} />
-                </div>
-                <div>
-                  <h4 className="font-bold text-amber-900">የመረጃ ጥበቃ ፖሊሲ (Data Protection Policy)</h4>
-                  <p className="text-sm text-amber-800/80 mt-1">
-                    ሁሉም የባካፕ ፋይሎች በቋሚነት ይቀመጣሉ። ሲስተሙ በራሱ ምንም አይነት መረጃ አያጠፋም። መረጃ ሊጠፋ የሚችለው በአድሚን ፍላጎትና ውሳኔ ብቻ ነው። 
-                    (All backup files are stored permanently. The system does not delete any data automatically. Data can only be deleted by explicit administrator action.)
-                  </p>
-                </div>
-              </div>
             </motion.div>
           )}
           {view === 'history' && (
@@ -1840,7 +1910,7 @@ function FormInput({ label, value, onChange, placeholder, icon }: { label: strin
   );
 }
 
-function Login({ onLogin, loading, serverStatus }: { onLogin: (c: any) => void, loading: boolean, serverStatus: 'checking' | 'online' | 'offline' }) {
+function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any) => void, loading: boolean, serverStatus: 'checking' | 'online' | 'offline', dbStatus: any }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
@@ -1870,8 +1940,25 @@ function Login({ onLogin, loading, serverStatus }: { onLogin: (c: any) => void, 
             <span className="text-[10px] font-bold uppercase tracking-widest text-blue-100">
               System: {serverStatus}
             </span>
+            {dbStatus && (
+              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-tighter ${
+                dbStatus.isPersistent ? 'bg-emerald-400/20 text-emerald-200' : 'bg-amber-400/20 text-amber-200'
+              }`}>
+                <DbIcon size={8} />
+                {dbStatus.dbType}
+              </div>
+            )}
           </div>
         </div>
+
+        {dbStatus && !dbStatus.isPersistent && (
+          <div className="bg-amber-50 p-4 border-b border-amber-100 flex items-start gap-3">
+            <ShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
+            <p className="text-[10px] text-amber-800 leading-tight">
+              <strong>ማስጠንቀቂያ፦</strong> መረጃዎች በቋሚነት አልተቀመጡም። ሲስተሙ ሲጠፋ መረጃዎች ሊጠፉ ይችላሉ። እባክዎ Supabase ወይም MongoDB ያገናኙ።
+            </p>
+          </div>
+        )}
         
         <form onSubmit={handleSubmit} className="p-10 space-y-6">
           <FormInput 

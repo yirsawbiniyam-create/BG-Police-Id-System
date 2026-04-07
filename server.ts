@@ -91,25 +91,35 @@ async function initDb() {
   initPromise = (async () => {
     try {
       if (SUPABASE_URL && SUPABASE_KEY) {
-        console.log("Connecting to Supabase...");
-        useSupabase = true;
-        
-        // Ensure default admin user in Supabase
-        const hashedPassword = bcrypt.hashSync("POLICE1234", 10);
-        const { data: adminUser, error: findError } = await supabase
-          .from('users')
-          .select('*')
-          .ilike('username', 'POLICE')
-          .single();
+        try {
+          console.log("Connecting to Supabase...");
+          useSupabase = true;
           
-        if (!adminUser) {
-          console.log("Creating default admin user in Supabase: POLICE");
-          await supabase.from('users').insert([{ username: "POLICE", password: hashedPassword, role: "Administrator" }]);
-        } else {
-          console.log("Default admin user exists in Supabase. Updating password.");
-          await supabase.from('users').update({ password: hashedPassword, role: "Administrator" }).eq('id', adminUser.id);
+          // Ensure default admin user in Supabase
+          const hashedPassword = bcrypt.hashSync("POLICE1234", 10);
+          const { data: adminUser, error: findError } = await supabase
+            .from('users')
+            .select('*')
+            .ilike('username', 'POLICE')
+            .single();
+            
+          if (findError && findError.code !== 'PGRST116') {
+             throw findError;
+          }
+
+          if (!adminUser) {
+            console.log("Creating default admin user in Supabase: POLICE");
+            await supabase.from('users').insert([{ username: "POLICE", password: hashedPassword, role: "Administrator" }]);
+          } else {
+            console.log("Default admin user exists in Supabase. Updating password.");
+            await supabase.from('users').update({ password: hashedPassword, role: "Administrator" }).eq('id', adminUser.id);
+          }
+          return true;
+        } catch (supaErr: any) {
+          console.error("Supabase connection failed:", supaErr.message);
+          useSupabase = false;
+          console.log("Attempting next database option...");
         }
-        return true;
       }
 
       if (MONGODB_URI) {
@@ -456,12 +466,23 @@ const authorizeRole = (roles: string[]) => {
 app.get("/api/health", async (req, res) => {
   console.log("Health check hit");
   const currentDb = await initDb();
+  let dbType = "sqlite";
+  if (useSupabase) dbType = "supabase";
+  else if (useMongoDB) dbType = "mongodb";
+
+  const isPersistent = useSupabase || useMongoDB;
+  const warning = (!isPersistent && isRender) ? "Running on SQLite without persistent storage. Data will be lost on restart." : null;
+
   res.json({ 
     ok: true, 
     status: "ok", 
     vercel: isVercel, 
+    render: isRender,
     path: req.path,
     dbInitialized: !!currentDb,
+    dbType,
+    isPersistent,
+    warning,
     dbError: dbError ? { message: dbError.message } : null,
     dbPath: DB_PATH
   });
@@ -489,7 +510,13 @@ app.post("/api/auth/reset-admin", async (req, res) => {
   if (!currentDb) return res.status(500).json({ error: "DB not init" });
   try {
     const hashedPassword = bcrypt.hashSync("POLICE1234", 10);
-    currentDb.prepare("INSERT OR REPLACE INTO users (username, password, role) VALUES (?, ?, ?)").run("POLICE", hashedPassword, "Administrator");
+    if (useSupabase) {
+      await supabase.from('users').upsert({ username: "POLICE", password: hashedPassword, role: "Administrator" }, { onConflict: 'username' });
+    } else if (useMongoDB) {
+      await User.findOneAndUpdate({ username: "POLICE" }, { password: hashedPassword, role: "Administrator" }, { upsert: true });
+    } else {
+      currentDb.prepare("INSERT OR REPLACE INTO users (username, password, role) VALUES (?, ?, ?)").run("POLICE", hashedPassword, "Administrator");
+    }
     res.json({ success: true, message: "Admin user reset to POLICE / POLICE1234" });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

@@ -3,30 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="preload" href="/src/main.tsx" as="script">
-
-    <!-- Content Security Policy (CSP) -->
-    <meta http-equiv="Content-Security-Policy" content="
-      default-src 'self' https:;
-      script-src 'self' https:;
-      style-src 'self' 'unsafe-inline' https:;
-      img-src 'self' data: https:;
-      font-src 'self' data: https:;
-      connect-src 'self' https://bg-police-id-system.vercel.app https:;
-      frame-src 'self' https:;
-    ">
-
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; connect-src 'self' https:; frame-src 'self' https:;">
     <title>BGR Police ID System</title>
-
-    <!-- Preload critical CSS -->
-    <link rel="preload" href="/styles/main.css" as="style">
-    <link rel="stylesheet" href="/styles/main.css">
-
   </head>
   <body>
     <div id="root"></div>
-
-    <!-- Main JS Bundle -->
     <script type="module" src="src/main.tsx"></script>
   </body>
 </html>
+
