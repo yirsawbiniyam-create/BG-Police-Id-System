@@ -1,10 +1,23 @@
-import {StrictMode} from 'react';
-import {createRoot} from 'react-dom/client';
-import App from './App';
-import './index.css';
+// api/health.js
+import express from 'express';
+const router = express.Router();
 
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-);
+// Health check endpoint
+router.get('/', async (req, res) => {
+  try {
+    // DB / service checks
+    const dbIsHealthy = true; // እውነተኛ DB ping በእውነት ይቀይሩ
+    const otherServiceOk = true;
+
+    if (dbIsHealthy && otherServiceOk) {
+      res.status(200).json({ status: 'ok', timestamp: new Date() });
+    } else {
+      res.status(500).json({ status: 'error', message: 'Service unavailable' });
+    }
+  } catch (err) {
+    console.error("Health check failed:", err);
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+});
+
+export default router;
