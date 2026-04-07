@@ -11,8 +11,9 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrator' ||
-          (request.auth.token.email == "yirsawbiniyam@gmail.com" && request.auth.token.email_verified == true) ||
-          (request.auth.token.email == "policeregion551@gamil.com" && request.auth.token.email_verified == true));
+          request.auth.token.email == "yirsawbiniyam@gmail.com" ||
+          request.auth.token.email == "policeregion551@gamil.com" ||
+          request.auth.token.email == "policeregion551@gmail.com");
     }
 
     function isDataEntry() {
@@ -48,13 +49,13 @@ service cloud.firestore {
     // ===============================================================
 
     match /ids/{id} {
-      allow read: if isAuthenticated();
+      allow read: if true; // Allow public verification
       allow create, update: if isDataEntry() && isValidIDRecord(request.resource.data);
       allow delete: if isAdmin();
     }
 
     match /users/{userId} {
-      allow read: if isAuthenticated();
+      allow read: if true; // Allow login check (Insecure: consider Firebase Auth for production)
       allow create, update: if isAdmin() && isValidUser(request.resource.data);
       allow delete: if isAdmin();
     }

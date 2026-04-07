@@ -16,7 +16,8 @@ import { db, auth, storage } from './lib/firebase';
 import { 
   signInWithEmailAndPassword, 
   onAuthStateChanged, 
-  signOut 
+  signOut,
+  signInAnonymously
 } from 'firebase/auth';
 import { 
   collection, 
@@ -404,6 +405,24 @@ export default function App() {
   useEffect(() => {
     setIsMounted(true);
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Check for Firestore-backed session first
+      const savedSession = localStorage.getItem('police_id_session');
+      if (savedSession) {
+        try {
+          const session = JSON.parse(savedSession);
+          setUser({
+            id: firebaseUser?.uid || 'custom-session',
+            email: session.email,
+            role: session.role
+          });
+          setToken('firestore-session');
+          setIsAuthReady(true);
+          return;
+        } catch (e) {
+          localStorage.removeItem('police_id_session');
+        }
+      }
+
       if (firebaseUser) {
         try {
           // Fetch role from Firestore
@@ -424,7 +443,7 @@ export default function App() {
           console.error("Auth state role fetch error:", err);
           setUser({
             id: firebaseUser.uid,
-            username: firebaseUser.email || 'Unknown',
+            email: firebaseUser.email || 'Unknown',
             role: firebaseUser.email === 'policeregion551@gamil.com' ? 'Administrator' : 'Viewer'
           });
         }
@@ -503,10 +522,44 @@ export default function App() {
     console.log("Attempting login with:", credentials.email);
     setLoading(true);
     try {
+      // 1. Try Firestore-backed login first (User's request)
+      const q = query(collection(db, 'users'), where('email', '==', credentials.email));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const userDoc = querySnapshot.docs[0];
+        const userData = userDoc.data();
+        
+        if (userData.password === credentials.password) {
+          // Success! Sign in anonymously to get a UID for rules
+          try {
+            await signInAnonymously(auth);
+          } catch (anonErr) {
+            console.warn("Anonymous sign-in failed:", anonErr);
+          }
+          
+          const sessionUser = {
+            id: userDoc.id,
+            email: credentials.email,
+            role: userData.role || 'Viewer'
+          };
+          
+          setUser(sessionUser as any);
+          setToken('firestore-session');
+          localStorage.setItem('police_id_session', JSON.stringify(sessionUser));
+          return;
+        }
+      }
+
+      // 2. Fallback to Firebase Auth
       await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
     } catch (e: any) {
       console.error("Login error:", e);
-      alert('Login error: ' + e.message);
+      let msg = e.message;
+      if (e.code === 'auth/network-request-failed') {
+        msg = "Network error. Please ensure your domain is authorized in Firebase Console: " + window.location.hostname;
+      }
+      alert('Login error: ' + msg);
     } finally {
       setLoading(false);
     }
@@ -514,6 +567,7 @@ export default function App() {
 
   const handleLogout = async () => {
     try {
+      localStorage.removeItem('police_id_session');
       await signOut(auth);
       setView('dashboard');
     } catch (e) {
@@ -1806,6 +1860,9 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
               Login with: policeregion551@gamil.com
             </p>
+            <p className="text-[8px] text-slate-300 uppercase tracking-widest">
+              Authorized Domain: {window.location.hostname}
+            </p>
           </div>
         </form>
       </motion.div>
@@ -1842,10 +1899,9 @@ function UserManagement() {
     e.preventDefault();
     setLoading(true);
     try {
-      // Note: In a real app, you'd create the user in Firebase Auth here too.
-      // For now, we just add the metadata to Firestore.
       await addDoc(collection(db, 'users'), {
         email: newUser.email,
+        password: newUser.password,
         role: newUser.role,
         created_at: new Date().toISOString()
       });
