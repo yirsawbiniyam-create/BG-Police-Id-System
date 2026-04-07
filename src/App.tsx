@@ -677,11 +677,18 @@ export default function App() {
         if (img.complete) return Promise.resolve();
         return new Promise(resolve => {
           const timeout = setTimeout(() => {
-            console.warn("Image load timed out:", img.src);
+            console.warn("Image load timed out, replacing with placeholder:", img.src);
+            // Replace with a safe placeholder if it fails to load or times out
+            img.src = "https://picsum.photos/seed/error/200/300";
             resolve(null);
-          }, 10000); // 10 second timeout per image
+          }, 12000); 
           img.onload = () => { clearTimeout(timeout); resolve(null); };
-          img.onerror = () => { clearTimeout(timeout); resolve(null); };
+          img.onerror = () => { 
+            clearTimeout(timeout); 
+            console.warn("Image failed to load, replacing with placeholder:", img.src);
+            img.src = "https://picsum.photos/seed/error/200/300";
+            resolve(null); 
+          };
         });
       });
       
@@ -692,8 +699,8 @@ export default function App() {
         useCORS: true,
         logging: true,
         backgroundColor: '#ffffff',
-        allowTaint: true, // Allow tainted canvas as a fallback
-        imageTimeout: 15000, // Reduce timeout to 15 seconds
+        allowTaint: false, // MUST be false to allow toDataURL
+        imageTimeout: 20000,
         onclone: (clonedDoc) => {
           const style = clonedDoc.createElement('style');
           style.innerHTML = `
