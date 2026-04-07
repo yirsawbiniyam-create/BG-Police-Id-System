@@ -671,23 +671,29 @@ export default function App() {
 
       document.body.appendChild(captureContainer);
 
-      // Explicitly wait for all images in the capture container to load
+      // Explicitly wait for all images in the capture container to load with a timeout
       const imagesToLoad = Array.from(captureContainer.querySelectorAll('img'));
-      await Promise.all(imagesToLoad.map(img => {
+      const imageLoadPromises = imagesToLoad.map(img => {
         if (img.complete) return Promise.resolve();
         return new Promise(resolve => {
-          img.onload = resolve;
-          img.onerror = resolve;
+          const timeout = setTimeout(() => {
+            console.warn("Image load timed out:", img.src);
+            resolve(null);
+          }, 10000); // 10 second timeout per image
+          img.onload = () => { clearTimeout(timeout); resolve(null); };
+          img.onerror = () => { clearTimeout(timeout); resolve(null); };
         });
-      }));
+      });
+      
+      await Promise.all(imageLoadPromises);
 
       const canvas = await html2canvas(captureContainer, {
-        scale: 2, // Moderate scale for better compatibility
+        scale: 2,
         useCORS: true,
-        logging: true, // Enable logging for debugging
+        logging: true,
         backgroundColor: '#ffffff',
-        allowTaint: false,
-        imageTimeout: 30000,
+        allowTaint: true, // Allow tainted canvas as a fallback
+        imageTimeout: 15000, // Reduce timeout to 15 seconds
         onclone: (clonedDoc) => {
           const style = clonedDoc.createElement('style');
           style.innerHTML = `
@@ -824,15 +830,27 @@ export default function App() {
       let commissioner_signature = finalData.commissioner_signature;
 
       if (finalData.photo_url && finalData.photo_url.startsWith('data:image')) {
-        const photoRef = ref(storage, `photos/${Date.now()}.jpg`);
-        await uploadString(photoRef, finalData.photo_url, 'data_url');
-        photo_url = await getDownloadURL(photoRef);
+        try {
+          const photoRef = ref(storage, `photos/${Date.now()}.jpg`);
+          await uploadString(photoRef, finalData.photo_url, 'data_url');
+          photo_url = await getDownloadURL(photoRef);
+        } catch (uploadErr: any) {
+          console.error("Photo upload failed, using base64 fallback:", uploadErr);
+          // If upload fails (CORS), we use the base64 string directly
+          // This is a fallback so the user can still save the record
+          photo_url = finalData.photo_url;
+        }
       }
 
       if (finalData.commissioner_signature && finalData.commissioner_signature.startsWith('data:image')) {
-        const sigRef = ref(storage, `signatures/${Date.now()}.png`);
-        await uploadString(sigRef, finalData.commissioner_signature, 'data_url');
-        commissioner_signature = await getDownloadURL(sigRef);
+        try {
+          const sigRef = ref(storage, `signatures/${Date.now()}.png`);
+          await uploadString(sigRef, finalData.commissioner_signature, 'data_url');
+          commissioner_signature = await getDownloadURL(sigRef);
+        } catch (uploadErr: any) {
+          console.error("Signature upload failed, using base64 fallback:", uploadErr);
+          commissioner_signature = finalData.commissioner_signature;
+        }
       }
 
       const isUpdate = !!finalData.id;
