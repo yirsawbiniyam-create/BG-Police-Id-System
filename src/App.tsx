@@ -592,6 +592,14 @@ export default function App() {
     setLoading(true);
     let captureContainer: HTMLDivElement | null = null;
     
+    // Safety timeout to prevent indefinite spinning
+    const safetyTimeout = setTimeout(() => {
+      if (loading) {
+        setLoading(false);
+        alert("ዝግጅቱ በጣም ዘግይቷል። እባክዎ በድጋሚ ይሞክሩ ወይም 'Print' የሚለውን አማራጭ ይጠቀሙ። (Preparation is taking too long. Please try again or use 'Print'.)");
+      }
+    }, 45000);
+
     try {
       // Small delay to ensure all images/fonts are fully rendered
       await new Promise(resolve => setTimeout(resolve, 2000));
@@ -728,6 +736,7 @@ export default function App() {
       console.error('Download error:', error);
       alert('ዳውንሎድ ማድረግ አልተቻለም። እባክዎ በድጋሚ ይሞክሩ ወይም "Print" የሚለውን አማራጭ ይጠቀሙ። (Download failed. Please try again or use the Print option.)');
     } finally {
+      clearTimeout(safetyTimeout);
       if (captureContainer && captureContainer.parentNode) {
         document.body.removeChild(captureContainer);
       }
@@ -1623,11 +1632,21 @@ export default function App() {
             </div>
             <h3 className="text-2xl font-bold text-slate-800 mt-8">መታወቂያው እየተዘጋጀ ነው...</h3>
             <p className="text-slate-500 mt-2 font-medium">Preparing ID Card... Please wait a moment.</p>
+            <p className="text-slate-400 text-[10px] mt-4 max-w-xs text-center">
+              ዳውንሎድ (Download) በጣም ከዘገየ "Print" የሚለውን አማራጭ ይጠቀሙ። ፕሪንት ፈጣን እና አስተማማኝ ነው። <br/>
+              (If Download is slow, please use the "Print" option.)
+            </p>
             <div className="mt-8 flex gap-2">
               <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.3s]"></div>
               <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce [animation-delay:-0.15s]"></div>
               <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
             </div>
+            <button 
+              onClick={() => setLoading(false)}
+              className="mt-10 px-8 py-3 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl text-sm font-bold transition-all border border-slate-200"
+            >
+              ይቅር (Cancel)
+            </button>
           </motion.div>
         )}
       </AnimatePresence>
