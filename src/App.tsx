@@ -60,8 +60,8 @@ interface IDRecord {
 }
 
 interface User {
-  id: number;
-  username: string;
+  id: string;
+  email: string;
   role: 'Administrator' | 'Data Entry' | 'Viewer';
 }
 
@@ -417,7 +417,7 @@ export default function App() {
           
           setUser({
             id: firebaseUser.uid,
-            username: firebaseUser.email || 'Unknown',
+            email: firebaseUser.email || 'Unknown',
             role: role as any
           });
         } catch (err) {

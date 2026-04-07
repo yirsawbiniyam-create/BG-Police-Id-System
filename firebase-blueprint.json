@@ -1,0 +1,68 @@
+{
+  "entities": {
+    "IDRecord": {
+      "title": "ID Record",
+      "description": "A police identification card record",
+      "type": "object",
+      "properties": {
+        "id_number": { "type": "string", "description": "Unique ID number" },
+        "full_name_am": { "type": "string", "description": "Full name in Amharic" },
+        "full_name_en": { "type": "string", "description": "Full name in English" },
+        "rank_am": { "type": "string", "description": "Rank in Amharic" },
+        "rank_en": { "type": "string", "description": "Rank in English" },
+        "responsibility_am": { "type": "string", "description": "Responsibility in Amharic" },
+        "responsibility_en": { "type": "string", "description": "Responsibility in English" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "photo_url": { "type": "string", "description": "URL to the member's photo" },
+        "blood_type": { "type": "string", "description": "Blood type" },
+        "badge_number": { "type": "string", "description": "Badge number" },
+        "gender": { "type": "string", "description": "Gender" },
+        "complexion": { "type": "string", "description": "Complexion" },
+        "height": { "type": "string", "description": "Height" },
+        "emergency_contact_name": { "type": "string", "description": "Emergency contact name" },
+        "emergency_contact_phone": { "type": "string", "description": "Emergency contact phone" },
+        "commissioner_signature": { "type": "string", "description": "URL to the commissioner's signature" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["id_number", "full_name_am", "full_name_en"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A system user with specific roles",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "format": "email", "description": "User email" },
+        "role": { "type": "string", "enum": ["Administrator", "Data Entry", "Viewer"], "description": "User role" },
+        "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
+      },
+      "required": ["email", "role"]
+    },
+    "Scan": {
+      "title": "Scan",
+      "description": "A record of an ID card scan",
+      "type": "object",
+      "properties": {
+        "id_number": { "type": "string", "description": "ID number scanned" },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Scan timestamp" },
+        "ip": { "type": "string", "description": "IP address of the scanner" },
+        "user_agent": { "type": "string", "description": "User agent of the scanner" }
+      },
+      "required": ["id_number", "timestamp"]
+    },
+    "Asset": {
+      "title": "Asset",
+      "description": "A system asset like a logo or flag",
+      "type": "object",
+      "properties": {
+        "value": { "type": "string", "description": "Base64 or URL value of the asset" }
+      },
+      "required": ["value"]
+    }
+  },
+  "firestore": {
+    "/ids/{id}": { "schema": "IDRecord", "description": "Collection of ID records" },
+    "/users/{userId}": { "schema": "User", "description": "Collection of system users" },
+    "/scans/{scanId}": { "schema": "Scan", "description": "Collection of scan history" },
+    "/assets/{assetId}": { "schema": "Asset", "description": "Collection of system assets" }
+  }
+}

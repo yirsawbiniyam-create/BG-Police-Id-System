@@ -1,0 +1,72 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrator' ||
+          (request.auth.token.email == "yirsawbiniyam@gmail.com" && request.auth.token.email_verified == true) ||
+          (request.auth.token.email == "policeregion551@gamil.com" && request.auth.token.email_verified == true));
+    }
+
+    function isDataEntry() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Data Entry' || isAdmin());
+    }
+
+    function isViewer() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Viewer' || isDataEntry());
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+    function isValidIDRecord(data) {
+      return data.id_number is string && data.id_number.size() > 0 &&
+             data.full_name_am is string && data.full_name_am.size() > 0 &&
+             data.full_name_en is string && data.full_name_en.size() > 0;
+    }
+
+    function isValidUser(data) {
+      return isValidEmail(data.email) &&
+             data.role in ['Administrator', 'Data Entry', 'Viewer'];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /ids/{id} {
+      allow read: if isAuthenticated();
+      allow create, update: if isDataEntry() && isValidIDRecord(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin() && isValidUser(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    match /scans/{scanId} {
+      allow read: if isAuthenticated();
+      allow create: if true; // Allow public scan logging
+    }
+
+    match /assets/{assetId} {
+      allow read: if true; // Allow public access to logos/flags
+      allow write: if isAdmin();
+    }
+  }
+}
