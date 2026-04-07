@@ -12,11 +12,33 @@ import Barcode from 'react-barcode';
 import { QRCodeSVG } from 'qrcode.react';
 import { useReactToPrint } from 'react-to-print';
 import { translateText } from './services/gemini';
+import { db, auth, storage } from './lib/firebase';
+import { 
+  signInWithEmailAndPassword, 
+  onAuthStateChanged, 
+  signOut 
+} from 'firebase/auth';
+import { 
+  collection, 
+  addDoc, 
+  getDocs, 
+  updateDoc, 
+  deleteDoc, 
+  doc, 
+  query, 
+  where, 
+  orderBy, 
+  onSnapshot,
+  setDoc,
+  getDoc,
+  limit
+} from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 // --- Types ---
 
 interface IDRecord {
-  id: number;
+  id: string;
   id_number: string;
   full_name_am: string;
   full_name_en: string;
@@ -47,6 +69,7 @@ interface Assets {
   bgr_flag?: string;
   eth_flag?: string;
   police_logo?: string;
+  commissioner_signature?: string;
 }
 
 // --- Helper Functions ---
@@ -198,6 +221,11 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
 });
 
 const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, assets: Assets }>(({ data, assets }, ref) => {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   return (
     <div 
       ref={ref}
@@ -274,7 +302,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
           <div className="flex flex-col items-center gap-0.5">
             <div className="p-1.5 bg-white border rounded-lg shadow-md" style={{ borderColor: '#e2e8f0' }}>
               <QRCodeSVG 
-                value={`${typeof window !== 'undefined' ? window.location.origin : ''}/verify/${data.id_number}`} 
+                value={`${isMounted ? window.location.origin : ''}/verify/${data.id_number}`} 
                 size={85} 
                 level="H"
               />
@@ -319,8 +347,9 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
 // --- Main App ---
 
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
   const [view, setView] = useState<'dashboard' | 'create' | 'history' | 'verify' | 'maintenance' | 'users'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [records, setRecords] = useState<IDRecord[]>([]);
@@ -350,54 +379,71 @@ export default function App() {
     emergency_contact_name: string;
     emergency_contact_phone: string;
     commissioner_signature: string;
-  }>(() => {
-    if (typeof window !== 'undefined') {
-      const savedDraft = localStorage.getItem('id_form_draft');
-      if (savedDraft) {
-        try {
-          return JSON.parse(savedDraft);
-        } catch (e) {
-          console.error("Failed to parse form draft:", e);
-        }
-      }
-    }
-    return {
-      id: null,
-      full_name_am: '',
-      full_name_en: '',
-      rank_am: '',
-      rank_en: '',
-      responsibility_am: '',
-      responsibility_en: '',
-      phone: '',
-      photo_url: '',
-      blood_type: '',
-      badge_number: '',
-      gender: '',
-      complexion: '',
-      height: '',
-      emergency_contact_name: '',
-      emergency_contact_phone: '',
-      commissioner_signature: ''
-    };
+  }>({
+    id: null,
+    full_name_am: '',
+    full_name_en: '',
+    rank_am: '',
+    rank_en: '',
+    responsibility_am: '',
+    responsibility_en: '',
+    phone: '',
+    photo_url: '',
+    blood_type: '',
+    badge_number: '',
+    gender: '',
+    complexion: '',
+    height: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    commissioner_signature: ''
   });
 
+  const [isMounted, setIsMounted] = useState(false);
+
   useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const res = await fetch('/api/health');
-        const data = await res.json();
-        setDbStatus({
-          isPersistent: data.isPersistent,
-          dbType: data.dbType,
-          warning: data.warning
-        });
-      } catch (e) {
-        console.error("Status check failed:", e);
+    setIsMounted(true);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          // Fetch role from Firestore
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          let role = 'Viewer';
+          if (userDoc.exists()) {
+            role = userDoc.data().role;
+          } else if (firebaseUser.email === 'policeregion551@gamil.com') {
+            role = 'Administrator';
+          }
+          
+          setUser({
+            id: firebaseUser.uid,
+            username: firebaseUser.email || 'Unknown',
+            role: role as any
+          });
+        } catch (err) {
+          console.error("Auth state role fetch error:", err);
+          setUser({
+            id: firebaseUser.uid,
+            username: firebaseUser.email || 'Unknown',
+            role: firebaseUser.email === 'policeregion551@gamil.com' ? 'Administrator' : 'Viewer'
+          });
+        }
+        setToken('firebase-token');
+      } else {
+        setUser(null);
+        setToken(null);
       }
-    };
-    checkStatus();
+      setIsAuthReady(true);
+    });
+    return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchAssets();
+      fetchRecords();
+    }
+  }, [user]);
 
   // Auto-save draft
   useEffect(() => {
@@ -438,207 +484,44 @@ export default function App() {
     }, 1500);
   };
 
-  const handleDeleteRecord = async (id: number) => {
+  const handleDeleteRecord = async (id: string) => {
     if (!confirm('ይህንን መረጃ በእርግጠኝነት ማጥፋት ይፈልጋሉ? (Are you sure you want to delete this record?)')) return;
     try {
-      const res = await apiFetch(`/api/ids/${id}`, { method: 'DELETE' });
-      const data = await res.json();
-      if (data.success) {
-        fetchRecords();
-        alert('መረጃው በትክክል ጠፍቷል! (Record deleted successfully)');
-      } else {
-        alert(data.error || 'መረጃውን ማጥፋት አልተቻለም (Failed to delete record)');
-      }
-    } catch (error) {
+      await deleteDoc(doc(db, 'ids', id));
+      fetchRecords();
+      alert('መረጃው በትክክል ጠፍቷል! (Record deleted successfully)');
+    } catch (error: any) {
       console.error("Delete error:", error);
-      alert('ስህተት ተፈጥሯል (An error occurred)');
+      alert('ስህተት ተፈጥሯል: ' + error.message);
     }
   };
 
   const [showScans, setShowScans] = useState(false);
   const [scanHistory, setScanHistory] = useState<any[]>([]);
 
-  useEffect(() => {
-    const savedToken = localStorage.getItem('token');
-    const savedUser = localStorage.getItem('user');
-    if (savedToken && savedUser && savedUser !== "undefined") {
-      try {
-        setToken(savedToken);
-        setUser(JSON.parse(savedUser));
-      } catch (e) {
-        console.error("Failed to parse saved user:", e);
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    console.log("Current Auth State:", { hasToken: !!token, user: user?.username });
-    if (token) {
-      fetchAssets();
-      fetchRecords();
-      if (user?.role === 'Administrator') {
-        fetchBackups();
-      }
-    }
-  }, [token, user]);
-
-  const apiFetch = async (url: string, options: any = {}) => {
-    const headers = {
-      ...options.headers,
-      'Authorization': `Bearer ${token}`
-    };
-    const res = await fetch(url, { ...options, headers });
-    if (res.status === 401 || res.status === 403) {
-      handleLogout();
-      throw new Error('Session expired');
-    }
-    return res;
-  };
-
-  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('checking');
-
-  useEffect(() => {
-    const checkServer = async () => {
-      try {
-        const res = await fetch('/api/health');
-        if (res.ok) setServerStatus('online');
-        else setServerStatus('offline');
-      } catch (e) {
-        setServerStatus('offline');
-      }
-    };
-    checkServer();
-    const interval = setInterval(checkServer, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
   const handleLogin = async (credentials: any) => {
-    console.log("Attempting login with:", credentials.username);
+    console.log("Attempting login with:", credentials.email);
     setLoading(true);
     try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(credentials)
-      });
-      
-      let data;
-      const contentType = res.headers.get("content-type");
-      if (contentType && contentType.indexOf("application/json") !== -1) {
-        data = await res.json();
-      } else {
-        const text = await res.text();
-        console.error("Non-JSON response:", text);
-        data = { error: `Server returned non-JSON response (${res.status})` };
-      }
-
-      if (res.ok) {
-        setToken(data.token);
-        setUser(data.user);
-        localStorage.setItem('token', data.token);
-        if (data.user) {
-          localStorage.setItem('user', JSON.stringify(data.user));
-        }
-      } else {
-        if (res.status === 404) {
-          alert('Server Error: Login API not found (404). The server might be restarting or the route is misconfigured.');
-        } else if (res.status === 405) {
-          alert('Server Error: Method Not Allowed (405).');
-        } else {
-          const errorMsg = data.error || `Login failed (${res.status})`;
-          const details = data.details ? `\n\nDetails: ${data.details}` : '';
-          alert(`${errorMsg}${details}`);
-        }
-      }
-    } catch (e) {
-      console.error("Login fetch error:", e);
-      alert('Login error: Could not connect to the server. Please check your internet connection or if the server is down.');
+      await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
+    } catch (e: any) {
+      console.error("Login error:", e);
+      alert('Login error: ' + e.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleLogout = () => {
-    setToken(null);
-    setUser(null);
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    setView('dashboard');
-  };
-
-  const fetchBackups = async () => {
+  const handleLogout = async () => {
     try {
-      const res = await apiFetch('/api/backups');
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const data = await res.json();
-      setBackups(data);
+      await signOut(auth);
+      setView('dashboard');
     } catch (e) {
-      console.error("Failed to fetch backups:", e);
+      console.error("Logout error:", e);
     }
   };
 
-  const createBackup = async () => {
-    setLoading(true);
-    try {
-      const res = await apiFetch('/api/backups', { method: 'POST' });
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const data = await res.json();
-      if (data.success) {
-        fetchBackups();
-        alert(`Backup created successfully: ${data.filename}`);
-      }
-    } catch (e) {
-      console.error("Backup error:", e);
-      alert("Backup failed. Check console for details.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const restoreBackup = async (filename: string) => {
-    if (!confirm(`Are you sure you want to restore from ${filename}? This will overwrite current data.`)) return;
-    setLoading(true);
-    try {
-      const res = await apiFetch('/api/backups/restore', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename })
-      });
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const data = await res.json();
-      if (data.success) {
-        alert("Database restored successfully. Refreshing data...");
-        fetchRecords();
-        fetchAssets();
-      }
-    } catch (e) {
-      console.error("Restore error:", e);
-      alert("Restore failed. Check console for details.");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const deleteBackup = async (filename: string) => {
-    if (!confirm(`ይህንን ባካፕ በእርግጠኝነት ማጥፋት ይፈልጋሉ? (Are you sure you want to delete backup: ${filename}?)`)) return;
-    setLoading(true);
-    try {
-      const res = await apiFetch(`/api/backups/${filename}`, { method: 'DELETE' });
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const data = await res.json();
-      if (data.success) {
-        fetchBackups();
-        alert("ባካፕ በትክክል ጠፍቷል (Backup deleted successfully)");
-      }
-    } catch (e) {
-      console.error("Delete backup error:", e);
-      alert("ባካፕ ማጥፋት አልተቻለም (Delete backup failed)");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('online');
 
   const handleDownload = async (idNumber: string, side: 'front' | 'back' | 'both' | 'combined') => {
     setLoading(true);
@@ -776,9 +659,9 @@ export default function App() {
 
   const fetchScans = async (idNumber: string) => {
     try {
-      const res = await apiFetch(`/api/scans/${idNumber}`);
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      const data = await res.json();
+      const q = query(collection(db, 'scans'), where('id_number', '==', idNumber), orderBy('timestamp', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => doc.data());
       setScanHistory(data);
       setShowScans(true);
     } catch (e) {
@@ -788,10 +671,8 @@ export default function App() {
 
   const fetchAssets = async () => {
     try {
-      const res = await apiFetch('/api/assets');
-      if (!res.ok) throw new Error('Failed to fetch assets');
-      const data = await res.json();
-      console.log("Assets fetched successfully:", Object.keys(data));
+      const querySnapshot = await getDocs(collection(db, 'assets'));
+      const data = querySnapshot.docs.reduce((acc: any, doc) => ({ ...acc, [doc.id]: doc.data().value }), {});
       setAssets(data);
     } catch (e) {
       console.error("Fetch assets error:", e);
@@ -801,9 +682,20 @@ export default function App() {
   const fetchRecords = async (search = '') => {
     setLoading(true);
     try {
-      const res = await apiFetch(`/api/ids?search=${search}`);
-      if (!res.ok) throw new Error('Failed to fetch records');
-      const data = await res.json();
+      let q;
+      if (search) {
+        // Simple search by full name (case sensitive in Firestore)
+        q = query(
+          collection(db, 'ids'), 
+          where('full_name_am', '>=', search), 
+          where('full_name_am', '<=', search + '\uf8ff'),
+          orderBy('full_name_am', 'asc')
+        );
+      } else {
+        q = query(collection(db, 'ids'), orderBy('full_name_am', 'asc'));
+      }
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ ...(doc.data() as any), id: doc.id })) as any[];
       setRecords(data);
     } catch (e) {
       console.error("Fetch records error:", e);
@@ -818,28 +710,15 @@ export default function App() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       let base64 = reader.result as string;
-      
-      // Resize assets to keep them small
       if (base64.startsWith('data:image')) {
         base64 = await resizeImage(base64, 400, 400);
       }
-
       try {
-        const res = await apiFetch('/api/assets', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ key, value: base64 })
-        });
-        if (res.ok) {
-          fetchAssets();
-        } else {
-          const errData = await res.json().catch(() => ({}));
-          console.error("Asset upload failed:", res.status, errData);
-          alert(`Asset upload failed: ${res.status} ${errData.error || ''}`);
-        }
+        await setDoc(doc(db, 'assets', key), { value: base64 });
+        fetchAssets();
       } catch (error) {
         console.error("Asset upload error:", error);
-        alert("Asset upload failed. Check console.");
+        alert("Asset upload failed");
       }
     };
     reader.readAsDataURL(file);
@@ -862,7 +741,6 @@ export default function App() {
     setTranslating(true);
     
     try {
-      // Auto-translate missing fields before submission
       const fields = ['full_name', 'rank', 'responsibility'];
       const finalData = { ...formData };
       
@@ -877,40 +755,71 @@ export default function App() {
         }
       }
 
-      const isUpdate = !!finalData.id;
-      const url = isUpdate ? `/api/ids/${finalData.id}` : '/api/ids';
-      const method = isUpdate ? 'PUT' : 'POST';
+      let photo_url = finalData.photo_url;
+      let commissioner_signature = finalData.commissioner_signature;
 
-      const res = await apiFetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(finalData)
-      });
-      
-      if (!res.ok) throw new Error(`Failed to ${isUpdate ? 'update' : 'create'} ID`);
-      
-      const result = await res.json();
-      if (result.success) {
-        fetchRecords();
-        const emptyForm = {
-          id: null,
-          full_name_am: '', full_name_en: '',
-          rank_am: '', rank_en: '',
-          responsibility_am: '', responsibility_en: '',
-          phone: '', photo_url: '',
-          blood_type: '', badge_number: '',
-          gender: '', complexion: '', height: '',
-          emergency_contact_name: '', emergency_contact_phone: '',
-          commissioner_signature: ''
-        };
-        setFormData(emptyForm);
-        localStorage.removeItem('id_form_draft');
-        setView('history');
-        alert(isUpdate ? "መረጃው በትክክል ተሻሽሏል!" : "መታወቂያው በትክክል ተመዝግቧል!");
+      if (finalData.photo_url && finalData.photo_url.startsWith('data:image')) {
+        const photoRef = ref(storage, `photos/${Date.now()}.jpg`);
+        await uploadString(photoRef, finalData.photo_url, 'data_url');
+        photo_url = await getDownloadURL(photoRef);
       }
-    } catch (error) {
+
+      if (finalData.commissioner_signature && finalData.commissioner_signature.startsWith('data:image')) {
+        const sigRef = ref(storage, `signatures/${Date.now()}.png`);
+        await uploadString(sigRef, finalData.commissioner_signature, 'data_url');
+        commissioner_signature = await getDownloadURL(sigRef);
+      }
+
+      const isUpdate = !!finalData.id;
+
+      if (isUpdate) {
+        await updateDoc(doc(db, 'ids', finalData.id!), {
+          ...finalData,
+          photo_url,
+          commissioner_signature
+        });
+        alert("መረጃው በትክክል ተሻሽሏል!");
+      } else {
+        const q = query(collection(db, 'ids'), orderBy('id_number', 'desc'), limit(1));
+        const querySnapshot = await getDocs(q);
+        let nextNum = 1;
+        if (!querySnapshot.empty) {
+          const lastIdNum = querySnapshot.docs[0].data().id_number;
+          const match = lastIdNum.match(/BGR-POL-(\d+)/);
+          if (match) {
+            nextNum = parseInt(match[1]) + 1;
+          }
+        }
+        const id_number = `BGR-POL-${String(nextNum).padStart(5, '0')}`;
+
+        await addDoc(collection(db, 'ids'), {
+          ...finalData,
+          id_number,
+          photo_url,
+          commissioner_signature,
+          created_at: new Date().toISOString()
+        });
+        alert("መታወቂያው በትክክል ተመዝግቧል!");
+      }
+
+      const emptyForm = {
+        id: null,
+        full_name_am: '', full_name_en: '',
+        rank_am: '', rank_en: '',
+        responsibility_am: '', responsibility_en: '',
+        phone: '', photo_url: '',
+        blood_type: '', badge_number: '',
+        gender: '', complexion: '', height: '',
+        emergency_contact_name: '', emergency_contact_phone: '',
+        commissioner_signature: ''
+      };
+      setFormData(emptyForm);
+      localStorage.removeItem('id_form_draft');
+      setView('history');
+      fetchRecords();
+    } catch (error: any) {
       console.error("Submission error:", error);
-      alert("ስህተት ተፈጥሯል! እባክዎ እንደገና ይሞክሩ። (Error: " + (error instanceof Error ? error.message : String(error)) + ")");
+      alert("ስህተት ተፈጥሯል! እባክዎ እንደገና ይሞክሩ። (Error: " + error.message + ")");
     } finally {
       setLoading(false);
       setTranslating(false);
@@ -918,14 +827,17 @@ export default function App() {
   };
 
   // Verification View Logic
-  const [isMounted, setIsMounted] = useState(false);
-  useEffect(() => {
-    setIsMounted(true);
-  }, []);
-
   if (isMounted && window.location.pathname.startsWith('/verify/')) {
     const idNum = window.location.pathname.split('/')[2];
     return <VerificationView idNumber={idNum} assets={assets} />;
+  }
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-500" size={48} />
+      </div>
+    );
   }
 
   if (!token) {
@@ -934,17 +846,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] text-slate-900 font-sans">
-      {/* Database Warning Banner */}
-      {dbStatus && !dbStatus.isPersistent && (
-        <div className="bg-amber-50 border-b border-amber-200 py-2 px-4 flex items-center justify-center gap-3 text-amber-800 text-xs font-medium">
-          <ShieldAlert size={16} className="text-amber-600" />
-          <span>
-            <strong>ማስጠንቀቂያ፦</strong> መረጃዎች በቋሚነት አልተቀመጡም። ሲስተሙ ሲጠፋ መረጃዎች ሊጠፉ ይችላሉ። እባክዎ Supabase ወይም MongoDB ያገናኙ።
-            <span className="ml-2 opacity-75">(Warning: Data is not persistent. Connect Supabase or MongoDB to save permanently.)</span>
-          </span>
-        </div>
-      )}
-
       {/* Navigation */}
       <nav className="bg-white border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -1011,14 +912,10 @@ export default function App() {
                 />
               </div>
               <div className="flex items-center gap-2 pl-4 border-l border-slate-200">
-                {dbStatus && (
-                  <div className={`flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider ${
-                    dbStatus.isPersistent ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                  }`}>
-                    <DbIcon size={12} />
-                    <span className="hidden lg:inline">{dbStatus.dbType}</span>
-                  </div>
-                )}
+                <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700">
+                  <DbIcon size={12} />
+                  <span className="hidden lg:inline">Firebase</span>
+                </div>
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-bold text-slate-900">{user?.username}</p>
                   <p className="text-[10px] text-slate-500 font-medium">{user?.role}</p>
@@ -1247,16 +1144,8 @@ export default function App() {
               <div className="flex justify-between items-center">
                 <div>
                   <h2 className="text-3xl font-bold">System Maintenance</h2>
-                  <p className="text-slate-500">Manage database backups and system integrity</p>
+                  <p className="text-slate-500">Manage system assets and integrity</p>
                 </div>
-                <button 
-                  onClick={createBackup}
-                  disabled={loading}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-50"
-                >
-                  <RefreshCw size={20} className={loading ? "animate-spin" : ""} />
-                  Backup Database Now
-                </button>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1268,107 +1157,49 @@ export default function App() {
                   <div className="p-6 space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-slate-500 font-medium">Database Type</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                        dbStatus?.isPersistent ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
-                      }`}>
-                        {dbStatus?.dbType || 'Checking...'}
+                      <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700">
+                        Firebase Firestore
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
                       <span className="text-sm text-slate-500 font-medium">Persistence</span>
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        dbStatus?.isPersistent ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-700'
-                      }`}>
-                        {dbStatus?.isPersistent ? 'Permanent' : 'Temporary'}
+                      <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
+                        Permanent
                       </span>
                     </div>
-                    {!dbStatus?.isPersistent && (
-                      <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100">
-                        <p className="text-[10px] text-amber-800 leading-relaxed">
-                          <strong>ማስጠንቀቂያ፦</strong> ሲስተሙ በአሁኑ ጊዜ መረጃዎችን በጊዜያዊነት (SQLite) እያስቀመጠ ነው። 
-                          Render ላይ ሲስተሙ ሲጠፋ ወይም ሲታደስ መረጃዎች ይጠፋሉ። 
-                          መረጃዎች በቋሚነት እንዲቀመጡ እባክዎ <strong>Supabase</strong> ወይም <strong>MongoDB</strong> ያገናኙ።
-                        </p>
-                        <p className="text-[9px] text-amber-700 mt-2 italic">
-                          (Warning: Currently using temporary SQLite storage. Data will be lost on Render restarts. 
-                          Connect Supabase or MongoDB for permanent storage.)
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="bg-amber-50 border border-amber-100 rounded-[32px] p-6 flex flex-col justify-center gap-4">
-                  <div className="flex gap-4 items-start">
-                    <div className="p-3 bg-amber-100 rounded-2xl text-amber-600">
-                      <Shield size={24} />
-                    </div>
-                    <div>
-                      <h4 className="font-bold text-amber-900">የመረጃ ጥበቃ ፖሊሲ (Data Protection Policy)</h4>
-                      <p className="text-sm text-amber-800/80 mt-1">
-                        ሁሉም የባካፕ ፋይሎች በቋሚነት ይቀመጣሉ። ሲስተሙ በራሱ ምንም አይነት መረጃ አያጠፋም። መረጃ ሊጠፋ የሚችለው በአድሚን ፍላጎትና ውሳኔ ብቻ ነው። 
+                    <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
+                      <p className="text-xs text-blue-700 leading-relaxed">
+                        System is currently using Firebase for all data and assets. Backups and data management can be handled directly through the Firebase Console.
                       </p>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
-                <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
-                  <HardDrive size={20} className="text-blue-600" />
-                  <h3 className="font-bold">Backup History</h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100">
-                        <th className="px-8 py-4">Filename</th>
-                        <th className="px-8 py-4">Date</th>
-                        <th className="px-8 py-4">Size</th>
-                        <th className="px-8 py-4 text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      {backups.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="px-8 py-12 text-center text-slate-400">
-                            No backups found.
-                          </td>
-                        </tr>
-                      ) : (
-                        backups.map((backup) => (
-                          <tr key={backup.filename} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-8 py-4 font-medium text-slate-700">{backup.filename}</td>
-                            <td className="px-8 py-4 text-slate-500 text-sm">
-                              {new Date(backup.createdAt).toLocaleString()}
-                            </td>
-                            <td className="px-8 py-4 text-slate-500 text-sm">
-                              {(backup.size / 1024 / 1024).toFixed(2)} MB
-                            </td>
-                            <td className="px-8 py-4 text-right">
-                              <div className="flex justify-end gap-2">
-                                <button 
-                                  onClick={() => restoreBackup(backup.filename)}
-                                  className="px-4 py-2 text-xs font-bold text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                >
-                                  Restore
-                                </button>
-                                <button 
-                                  onClick={() => deleteBackup(backup.filename)}
-                                  className="px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                >
-                                  Delete
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
+                <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
+                  <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+                    <Award size={20} className="text-blue-600" />
+                    <h3 className="font-bold">System Assets</h3>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Commissioner Signature</label>
+                      <div className="flex items-center gap-4">
+                        <div className="flex-1 h-24 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden">
+                          {assets.commissioner_signature ? (
+                            <img src={assets.commissioner_signature} className="h-full object-contain" alt="Signature" />
+                          ) : (
+                            <span className="text-xs text-slate-400">No signature uploaded</span>
+                          )}
+                        </div>
+                        <label className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold cursor-pointer transition-all">
+                          Upload
+                          <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAssetUpload('commissioner_signature', e)} />
+                        </label>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
-
             </motion.div>
           )}
           {view === 'history' && (
@@ -1515,7 +1346,7 @@ export default function App() {
             </motion.div>
           )}
           {view === 'users' && user?.role === 'Administrator' && (
-            <UserManagement apiFetch={apiFetch} />
+            <UserManagement />
           )}
         </AnimatePresence>
       </main>
@@ -1589,7 +1420,7 @@ export default function App() {
                     {scanHistory.map((scan) => (
                       <div key={scan.id} className="p-4 bg-slate-50 rounded-2xl border border-slate-100">
                         <div className="flex justify-between items-start mb-2">
-                          <span className="text-xs font-bold text-blue-600">{new Date(scan.scanned_at).toLocaleString()}</span>
+                          <span className="text-xs font-bold text-blue-600">{isMounted ? new Date(scan.scanned_at).toLocaleString() : ''}</span>
                           <span className="text-[10px] bg-slate-200 px-2 py-0.5 rounded text-slate-600 font-mono">{scan.ip_address}</span>
                         </div>
                         <p className="text-[10px] text-slate-500 font-mono break-all">{scan.user_agent}</p>
@@ -1911,12 +1742,12 @@ function FormInput({ label, value, onChange, placeholder, icon }: { label: strin
 }
 
 function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any) => void, loading: boolean, serverStatus: 'checking' | 'online' | 'offline', dbStatus: any }) {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('policeregion551@gamil.com');
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onLogin({ username: username.trim(), password });
+    onLogin({ email: email.trim(), password });
   };
 
   return (
@@ -1933,39 +1764,19 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
           <h2 className="text-2xl font-bold">BGR Police Commission</h2>
           <p className="text-blue-100 text-sm mt-1">ID Management System Login</p>
           <div className="mt-4 flex justify-center items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${
-              serverStatus === 'online' ? 'bg-emerald-400 animate-pulse' : 
-              serverStatus === 'offline' ? 'bg-red-400' : 'bg-slate-400'
-            }`} />
-            <span className="text-[10px] font-bold uppercase tracking-widest text-blue-100">
-              System: {serverStatus}
-            </span>
-            {dbStatus && (
-              <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-tighter ${
-                dbStatus.isPersistent ? 'bg-emerald-400/20 text-emerald-200' : 'bg-amber-400/20 text-amber-200'
-              }`}>
-                <DbIcon size={8} />
-                {dbStatus.dbType}
-              </div>
-            )}
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-tighter bg-emerald-400/20 text-emerald-200">
+              <DbIcon size={8} />
+              Firebase
+            </div>
           </div>
         </div>
-
-        {dbStatus && !dbStatus.isPersistent && (
-          <div className="bg-amber-50 p-4 border-b border-amber-100 flex items-start gap-3">
-            <ShieldAlert size={16} className="text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-[10px] text-amber-800 leading-tight">
-              <strong>ማስጠንቀቂያ፦</strong> መረጃዎች በቋሚነት አልተቀመጡም። ሲስተሙ ሲጠፋ መረጃዎች ሊጠፉ ይችላሉ። እባክዎ Supabase ወይም MongoDB ያገናኙ።
-            </p>
-          </div>
-        )}
         
         <form onSubmit={handleSubmit} className="p-10 space-y-6">
           <FormInput 
-            label="Username" 
-            value={username} 
-            onChange={setUsername} 
-            placeholder="Enter username" 
+            label="Email" 
+            value={email} 
+            onChange={setEmail} 
+            placeholder="Enter email" 
             icon={<User size={18} />} 
           />
           <div className="space-y-1.5">
@@ -1993,25 +1804,8 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
           </button>
           <div className="text-center space-y-2">
             <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-              DEFAULT: POLICE / POLICE1234
+              Login with: policeregion551@gamil.com
             </p>
-            <button 
-              type="button"
-              onClick={async () => {
-                if(confirm("Reset admin user to default?")) {
-                  try {
-                    const res = await fetch('/api/auth/reset-admin', { method: 'POST' });
-                    const data = await res.json();
-                    alert(data.message || "Reset successful");
-                  } catch (e) {
-                    alert("Reset failed");
-                  }
-                }
-              }}
-              className="text-[10px] text-blue-400 hover:text-blue-600 font-bold uppercase tracking-widest"
-            >
-              Reset Admin Account
-            </button>
           </div>
         </form>
       </motion.div>
@@ -2019,16 +1813,25 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
   );
 }
 
-function UserManagement({ apiFetch }: { apiFetch: (u: string, o?: any) => Promise<Response> }) {
+function UserManagement() {
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [newUser, setNewUser] = useState({ username: '', password: '', role: 'Viewer' });
+  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'Viewer' });
 
   const fetchUsers = async () => {
-    const res = await apiFetch('/api/users');
-    const data = await res.json();
-    setUsers(data);
+    try {
+      const q = query(collection(db, 'users'), orderBy('created_at', 'desc'));
+      const querySnapshot = await getDocs(q);
+      const data = querySnapshot.docs.map(doc => ({ ...(doc.data() as any), id: doc.id }));
+      setUsers(data);
+    } catch (e) {
+      console.error("Fetch users error:", e);
+    }
   };
 
   useEffect(() => {
@@ -2039,51 +1842,38 @@ function UserManagement({ apiFetch }: { apiFetch: (u: string, o?: any) => Promis
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await apiFetch('/api/users', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUser)
+      // Note: In a real app, you'd create the user in Firebase Auth here too.
+      // For now, we just add the metadata to Firestore.
+      await addDoc(collection(db, 'users'), {
+        email: newUser.email,
+        role: newUser.role,
+        created_at: new Date().toISOString()
       });
-      if (res.ok) {
-        fetchUsers();
-        setShowAdd(false);
-        setNewUser({ username: '', password: '', role: 'Viewer' });
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to add user');
-      }
+      fetchUsers();
+      setShowAdd(false);
+      setNewUser({ email: '', password: '', role: 'Viewer' });
     } catch (e) {
-      alert('Error adding user');
+      console.error("Add user error:", e);
+      alert("Failed to add user");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleDeleteUser = async (id: number) => {
+  const handleDeleteUser = async (id: string) => {
     if (!confirm('Are you sure you want to delete this user?')) return;
     try {
-      const res = await apiFetch(`/api/users/${id}`, { method: 'DELETE' });
-      if (res.ok) {
-        fetchUsers();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Failed to delete user');
-      }
+      await deleteDoc(doc(db, 'users', id));
+      fetchUsers();
     } catch (e) {
       alert('Error deleting user');
     }
   };
 
-  const handleUpdateRole = async (id: number, role: string) => {
+  const handleUpdateRole = async (id: string, role: string) => {
     try {
-      const res = await apiFetch(`/api/users/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role })
-      });
-      if (res.ok) {
-        fetchUsers();
-      }
+      await updateDoc(doc(db, 'users', id), { role });
+      fetchUsers();
     } catch (e) {
       alert('Error updating role');
     }
@@ -2109,7 +1899,7 @@ function UserManagement({ apiFetch }: { apiFetch: (u: string, o?: any) => Promis
         <table className="w-full text-left">
           <thead>
             <tr className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50/50">
-              <th className="px-8 py-4">Username</th>
+              <th className="px-8 py-4">Email</th>
               <th className="px-8 py-4">Role</th>
               <th className="px-8 py-4">Created At</th>
               <th className="px-8 py-4 text-right">Actions</th>
@@ -2118,7 +1908,7 @@ function UserManagement({ apiFetch }: { apiFetch: (u: string, o?: any) => Promis
           <tbody className="divide-y divide-slate-50">
             {users.map((u) => (
               <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
-                <td className="px-8 py-4 font-bold text-slate-700">{u.username}</td>
+                <td className="px-8 py-4 font-bold text-slate-700">{u.email || u.username}</td>
                 <td className="px-8 py-4">
                   <select 
                     value={u.role}
@@ -2131,7 +1921,7 @@ function UserManagement({ apiFetch }: { apiFetch: (u: string, o?: any) => Promis
                   </select>
                 </td>
                 <td className="px-8 py-4 text-slate-500 text-sm">
-                  {new Date(u.created_at).toLocaleDateString()}
+                  {isMounted ? new Date(u.created_at).toLocaleDateString() : ''}
                 </td>
                 <td className="px-8 py-4 text-right">
                   <button 
@@ -2171,10 +1961,10 @@ function UserManagement({ apiFetch }: { apiFetch: (u: string, o?: any) => Promis
               </div>
               <form onSubmit={handleAddUser} className="p-8 space-y-6">
                 <FormInput 
-                  label="Username" 
-                  value={newUser.username} 
-                  onChange={(v) => setNewUser({...newUser, username: v})} 
-                  placeholder="Username" 
+                  label="Email" 
+                  value={newUser.email} 
+                  onChange={(v) => setNewUser({...newUser, email: v})} 
+                  placeholder="Email Address" 
                   icon={<User size={18} />} 
                 />
                 <div className="space-y-1.5">
@@ -2230,21 +2020,28 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
   useEffect(() => {
     const fetchData = async () => {
       try {
-        // Fetch record if not already loaded or if idNumber changed
-        if (!record || record.id_number !== idNumber) {
-          const recordRes = await fetch(`/api/ids/${idNumber}`);
-          if (!recordRes.ok) throw new Error(`HTTP error! status: ${recordRes.status}`);
-          const recordData = await recordRes.json();
+        // Fetch record from Firestore
+        const q = query(collection(db, 'ids'), where('id_number', '==', idNumber), limit(1));
+        const querySnapshot = await getDocs(q);
+        if (!querySnapshot.empty) {
+          const recordDoc = querySnapshot.docs[0];
+          const recordData = { ...recordDoc.data(), id: recordDoc.id } as IDRecord;
           setRecord(recordData);
+
+          // Log scan
+          await addDoc(collection(db, 'scans'), {
+            id_number: idNumber,
+            timestamp: new Date().toISOString(),
+            ip: 'Client-side',
+            user_agent: navigator.userAgent
+          });
         }
 
         // Fetch assets if they are empty
         if (Object.keys(assets).length === 0) {
-          const assetsRes = await fetch('/api/assets');
-          if (assetsRes.ok) {
-            const assetsData = await assetsRes.json();
-            setAssets(assetsData);
-          }
+          const assetsSnapshot = await getDocs(collection(db, 'assets'));
+          const assetsData = assetsSnapshot.docs.reduce((acc: any, doc) => ({ ...acc, [doc.id]: doc.data().value }), {});
+          setAssets(assetsData);
         }
       } catch (err) {
         console.error("Verification fetch error:", err);
@@ -2255,7 +2052,7 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
     };
 
     fetchData();
-  }, [idNumber]); // Only depend on idNumber
+  }, [idNumber]);
 
   if (loading) return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50">
