@@ -519,11 +519,18 @@ export default function App() {
   const [scanHistory, setScanHistory] = useState<any[]>([]);
 
   const handleLogin = async (credentials: any) => {
-    console.log("Attempting login with:", credentials.email);
+    let email = credentials.email.trim().toLowerCase();
+    
+    // Auto-correct common typo
+    if (email.endsWith('@gamil.com')) {
+      email = email.replace('@gamil.com', '@gmail.com');
+    }
+    
+    console.log("Attempting login with:", email);
     setLoading(true);
     try {
       // 1. Try Firestore-backed login first (User's request)
-      const q = query(collection(db, 'users'), where('email', '==', credentials.email));
+      const q = query(collection(db, 'users'), where('email', '==', email));
       const querySnapshot = await getDocs(q);
       
       if (!querySnapshot.empty) {
@@ -540,7 +547,7 @@ export default function App() {
           
           const sessionUser = {
             id: userDoc.id,
-            email: credentials.email,
+            email: email,
             role: userData.role || 'Viewer'
           };
           
@@ -552,7 +559,7 @@ export default function App() {
       }
 
       // 2. Fallback to Firebase Auth
-      await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
+      await signInWithEmailAndPassword(auth, email, credentials.password);
     } catch (e: any) {
       console.error("Login error:", e);
       let msg = e.message;
@@ -560,6 +567,8 @@ export default function App() {
         msg = "Network error. Please ensure your domain is authorized in Firebase Console: " + window.location.hostname;
       } else if (e.code === 'auth/operation-not-allowed') {
         msg = "የመግቢያ ዘዴው አልበራም (Login method not enabled). እባክዎን በፋየርቤዝ ኮንሶል (Firebase Console) ውስጥ 'Email/Password' እና 'Anonymous' መግቢያዎችን ያብሩ።";
+      } else if (e.code === 'auth/invalid-email') {
+        msg = "የተሳሳተ ኢሜል ነው (Invalid email). እባክዎን ኢሜልዎን በትክክል መጻፍዎን ያረጋግጡ።";
       }
       alert('Login error: ' + msg);
     } finally {
@@ -907,8 +916,15 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16 items-center">
             <div className="flex items-center gap-3 cursor-pointer" onClick={() => setView('dashboard')}>
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-200">
-                <Shield size={24} />
+              <div className="relative">
+                <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center text-white shadow-lg shadow-blue-200">
+                  <Shield size={24} />
+                </div>
+                <div className="absolute -top-1 -right-1 w-4 h-3 rounded-[1px] overflow-hidden border border-white shadow-sm flex">
+                  <div className="flex-1 bg-[#009a44]" />
+                  <div className="flex-1 bg-[#fedd00]" />
+                  <div className="flex-1 bg-[#ef3340]" />
+                </div>
               </div>
               <div>
                 <h1 className="text-lg font-bold leading-none text-blue-900">BGR Police</h1>
@@ -999,6 +1015,29 @@ export default function App() {
               exit={{ opacity: 0, y: -20 }}
               className="space-y-8"
             >
+              {/* Main Dashboard Header */}
+              <div className="flex flex-col items-center justify-center text-center space-y-4 mb-12">
+                <div className="flex items-center gap-4 md:gap-8">
+                  <img 
+                    src="https://upload.wikimedia.org/wikipedia/commons/7/71/Flag_of_Ethiopia.svg" 
+                    alt="Ethiopian Flag" 
+                    className="w-12 h-8 md:w-20 md:h-12 object-cover rounded shadow-md border border-slate-200"
+                    referrerPolicy="no-referrer"
+                  />
+                  <h2 className="text-2xl md:text-4xl font-black bg-gradient-to-b from-[#FFD700] via-[#D4AF37] to-[#B8860B] bg-clip-text text-transparent drop-shadow-md tracking-tight leading-tight">
+                    የቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን <br />
+                    የፖሊስ መታወቂያ ካርድ ሲስተም
+                  </h2>
+                  <img 
+                    src="https://upload.wikimedia.org/wikipedia/commons/7/71/Flag_of_Ethiopia.svg" 
+                    alt="Ethiopian Flag" 
+                    className="w-12 h-8 md:w-20 md:h-12 object-cover rounded shadow-md border border-slate-200"
+                    referrerPolicy="no-referrer"
+                  />
+                </div>
+                <div className="h-1 w-48 bg-gradient-to-r from-transparent via-[#D4AF37] to-transparent rounded-full opacity-60" />
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <StatCard title="Total IDs" value={records.length} icon={<User className="text-blue-600" />} />
                 <StatCard title="Recent Scans" value="24" icon={<Eye className="text-emerald-600" />} />
@@ -1813,18 +1852,16 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-md bg-white rounded-[40px] shadow-2xl overflow-hidden"
       >
-        <div className="p-10 bg-blue-600 text-white text-center">
+        <div className="p-10 bg-blue-600 text-white text-center relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-1.5 flex">
+            <div className="flex-1 bg-[#009a44]" />
+            <div className="flex-1 bg-[#fedd00]" />
+            <div className="flex-1 bg-[#ef3340]" />
+          </div>
           <div className="w-16 h-16 bg-white/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <Shield size={32} />
           </div>
           <h2 className="text-2xl font-bold">BGR Police Commission</h2>
-          <p className="text-blue-100 text-sm mt-1">ID Management System Login</p>
-          <div className="mt-4 flex justify-center items-center gap-2">
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full text-[8px] font-bold uppercase tracking-tighter bg-emerald-400/20 text-emerald-200">
-              <DbIcon size={8} />
-              Firebase
-            </div>
-          </div>
         </div>
         
         <form onSubmit={handleSubmit} className="p-10 space-y-6">
@@ -1858,9 +1895,12 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
             {loading && <Loader2 className="animate-spin" size={18} />}
             Sign In
           </button>
-          <div className="text-center space-y-2">
-            <p className="text-[8px] text-slate-300 uppercase tracking-widest">
-              Authorized Domain: {window.location.hostname}
+          <div className="text-center pt-4 border-t border-slate-100">
+            <p className="text-[10px] font-bold text-slate-900 leading-relaxed">
+              በቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን ቴክኖሎጂ ማስፋፊያ ክፍል የተሰራ
+            </p>
+            <p className="text-[10px] font-black text-[#D4AF37] mt-1">
+              (by D,Ins B.Y)
             </p>
           </div>
         </form>
