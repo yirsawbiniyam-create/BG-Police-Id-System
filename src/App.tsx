@@ -522,19 +522,6 @@ export default function App() {
     console.log("Attempting login with:", credentials.email);
     setLoading(true);
     try {
-      // 0. Temporary Offline Bypass (While user fixes Firebase settings)
-      if (credentials.email === 'policeregion551@gmail.com' && credentials.password === 'Po12345@') {
-        const sessionUser = {
-          id: 'offline-admin',
-          email: credentials.email,
-          role: 'Administrator'
-        };
-        setUser(sessionUser as any);
-        setToken('offline-session');
-        localStorage.setItem('police_id_session', JSON.stringify(sessionUser));
-        return;
-      }
-
       // 1. Try Firestore-backed login first (User's request)
       const q = query(collection(db, 'users'), where('email', '==', credentials.email));
       const querySnapshot = await getDocs(q);
@@ -572,7 +559,7 @@ export default function App() {
       if (e.code === 'auth/network-request-failed') {
         msg = "Network error. Please ensure your domain is authorized in Firebase Console: " + window.location.hostname;
       } else if (e.code === 'auth/operation-not-allowed') {
-        msg = "Login method not enabled. Please enable 'Email/Password' and 'Anonymous' sign-in in the Firebase Console (Authentication > Sign-in method).";
+        msg = "የመግቢያ ዘዴው አልበራም (Login method not enabled). እባክዎን በፋየርቤዝ ኮንሶል (Firebase Console) ውስጥ 'Email/Password' እና 'Anonymous' መግቢያዎችን ያብሩ።";
       }
       alert('Login error: ' + msg);
     } finally {
@@ -1874,9 +1861,6 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
           <div className="text-center space-y-2">
             <p className="text-[8px] text-slate-300 uppercase tracking-widest">
               Authorized Domain: {window.location.hostname}
-            </p>
-            <p className="text-[8px] text-emerald-500 uppercase tracking-widest font-bold">
-              Offline Mode Available
             </p>
           </div>
         </form>
