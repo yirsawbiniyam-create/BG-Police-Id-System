@@ -430,7 +430,7 @@ export default function App() {
           let role = 'Viewer';
           if (userDoc.exists()) {
             role = userDoc.data().role;
-          } else if (firebaseUser.email === 'policeregion551@gamil.com') {
+          } else if (firebaseUser.email === 'policeregion551@gmail.com') {
             role = 'Administrator';
           }
           
@@ -444,7 +444,7 @@ export default function App() {
           setUser({
             id: firebaseUser.uid,
             email: firebaseUser.email || 'Unknown',
-            role: firebaseUser.email === 'policeregion551@gamil.com' ? 'Administrator' : 'Viewer'
+            role: firebaseUser.email === 'policeregion551@gmail.com' ? 'Administrator' : 'Viewer'
           });
         }
         setToken('firebase-token');
@@ -1798,7 +1798,7 @@ function FormInput({ label, value, onChange, placeholder, icon }: { label: strin
 }
 
 function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any) => void, loading: boolean, serverStatus: 'checking' | 'online' | 'offline', dbStatus: any }) {
-  const [email, setEmail] = useState('policeregion551@gamil.com');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -1859,9 +1859,6 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
             Sign In
           </button>
           <div className="text-center space-y-2">
-            <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold">
-              Login with: policeregion551@gamil.com
-            </p>
             <p className="text-[8px] text-slate-300 uppercase tracking-widest">
               Authorized Domain: {window.location.hostname}
             </p>
