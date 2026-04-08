@@ -114,8 +114,9 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
       className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] overflow-hidden flex flex-col p-[1.5mm] select-none box-border"
       style={{ 
         printColorAdjust: 'exact',
+        WebkitPrintColorAdjust: 'exact',
         background: 'linear-gradient(135deg, #fcd34d 0%, #fffbeb 40%, #ffffff 60%, #dbeafe 100%)',
-        border: '0.2mm solid rgba(30, 58, 138, 0.1)'
+        border: 'none'
       }}
     >
       {/* Background Pattern / Security Element */}
@@ -232,8 +233,9 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
       className="relative w-[85.6mm] h-[53.98mm] rounded-[3.18mm] overflow-hidden flex flex-col p-[2mm] select-none box-border"
       style={{ 
         printColorAdjust: 'exact',
+        WebkitPrintColorAdjust: 'exact',
         backgroundColor: '#ffffff',
-        border: '0.2mm solid rgba(0, 0, 0, 0.05)'
+        border: 'none'
       }}
     >
       {/* Watermark */}
@@ -1562,15 +1564,15 @@ export default function App() {
 
       {/* Off-screen Print Content */}
       <div 
-        style={{ position: 'absolute', left: '0', top: '0', width: '100%', height: '0', overflow: 'hidden', opacity: 0, pointerEvents: 'none', zIndex: -1000 }}
+        style={{ position: 'fixed', left: '-9999px', top: '0', width: '85.6mm', height: 'auto', overflow: 'hidden', opacity: 0, pointerEvents: 'none', zIndex: -1000 }}
         className="no-print"
       >
-        <div ref={printRef} key={`${selectedRecord?.id}-${printSide}`} className="print-container">
+        <div ref={printRef} key={`${selectedRecord?.id}-${printSide}`} className="print-container" style={{ margin: 0, padding: 0 }}>
           {selectedRecord && (
-            <>
+            <div style={{ margin: 0, padding: 0 }}>
               {printSide === 'combined' ? (
-                <div className="flex flex-col gap-0">
-                  <div className="print-card" style={{ pageBreakAfter: 'avoid' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', margin: 0, padding: 0 }}>
+                  <div className="print-card">
                     <IDCardFront data={selectedRecord} assets={assets} />
                   </div>
                   <div className="print-card">
@@ -1578,7 +1580,7 @@ export default function App() {
                   </div>
                 </div>
               ) : (
-                <>
+                <div style={{ margin: 0, padding: 0 }}>
                   {(printSide === 'both' || printSide === 'front') && (
                     <div className="print-card">
                       <IDCardFront data={selectedRecord} assets={assets} />
@@ -1589,9 +1591,9 @@ export default function App() {
                       <IDCardBack data={selectedRecord} assets={assets} />
                     </div>
                   )}
-                </>
+                </div>
               )}
-            </>
+            </div>
           )}
         </div>
       </div>

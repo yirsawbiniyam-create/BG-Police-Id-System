@@ -85,14 +85,21 @@
 }
 
 @media print {
+  /* 
+     ATM Size (CR80): 85.60 x 53.98 mm
+     We set the page size to exactly this to ensure 1:1 printing on ID printers.
+     If printing on A4, the browser will handle the placement.
+  */
   @page {
     size: 85.6mm 53.98mm;
     margin: 0mm;
   }
-  body {
+  html, body {
+    width: 85.6mm !important;
+    height: 53.98mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
     background: white !important;
-    margin: 0;
-    padding: 0;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -104,12 +111,14 @@
     width: 85.6mm !important;
     margin: 0 !important;
     padding: 0 !important;
+    border: none !important;
   }
   .print-card {
     width: 85.6mm !important;
     height: 53.98mm !important;
     page-break-after: always;
     page-break-inside: avoid;
+    break-inside: avoid;
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
@@ -118,6 +127,12 @@
     position: relative;
     background-color: white;
     -webkit-print-color-adjust: exact;
+  }
+  
+  /* Remove page break from the last card to prevent blank page */
+  .print-card:last-child {
+    page-break-after: auto;
+    break-after: auto;
   }
   
   /* Ensure text doesn't scale weirdly */
