@@ -270,10 +270,10 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             <div className="flex-1 h-[0.3mm] bg-gradient-to-r from-red-600/40 to-transparent"></div>
           </div>
           <p className="text-[7.5px] font-black leading-tight text-justify" style={{ color: '#000000' }}>
-            ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡  መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
+            ይህ የመታወቂያ ካርድ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን ንብረት ነው፡፡ ይህንን መታወቂያ የያዘ ግለሰብ የኮሚሽኑ የፖሊስ አባል በመሆኑ ሕግን የማስከበርና የማስገደድ ሙሉ ሥልጣን ተሰጥቶታል፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
           </p>
           <p className="text-[6.5px] font-extrabold italic leading-tight text-justify" style={{ color: '#1e293b' }}>
-            The Bearer of this ID card member of Police and is authorized to enforce the Law. He is obliged to this ID card.  If found, please return it to the nearest police station.
+            This identity card is the property of the BGR Police Commission. The holder is a member of the police commission and is fully authorized to enforce the law. If found, please return it to the nearest police station.
           </p>
         </div>
 
@@ -458,6 +458,7 @@ export default function App() {
     member_signature: string;
     issued_at: string;
     expires_at: string;
+    id_number: string;
   }>({
     id: null,
     full_name_am: '',
@@ -477,8 +478,12 @@ export default function App() {
     emergency_contact_phone: '',
     commissioner_signature: '',
     member_signature: '',
+    issued_at: new Date().toISOString().split('T')[0],
+    expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
     id_number: ''
   });
+
+  const [translationError, setTranslationError] = useState(false);
 
   const emptyForm = {
     id: null,
@@ -1029,14 +1034,30 @@ export default function App() {
       const fields = ['full_name', 'rank', 'responsibility'];
       const finalData = { ...formData };
       
+      const translateWithTimeout = async (text: string, target: 'en' | 'am') => {
+        if (translationError) return '';
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Translation timed out')), 15000)
+        );
+        try {
+          return await Promise.race([translateText(text, target), timeoutPromise]) as string;
+        } catch (err: any) {
+          console.warn("Translation failed or timed out:", err);
+          if (err.message?.includes("timed out") || err.message?.includes("leaked") || err.message?.includes("invalid")) {
+            setTranslationError(true);
+          }
+          return '';
+        }
+      };
+      
       for (const field of fields) {
         const amKey = `${field}_am` as keyof typeof formData;
         const enKey = `${field}_en` as keyof typeof formData;
         
         if (formData[amKey] && !formData[enKey]) {
-          finalData[enKey] = await translateText(formData[amKey], 'en');
+          finalData[enKey] = await translateWithTimeout(formData[amKey] as string, 'en');
         } else if (formData[enKey] && !formData[amKey]) {
-          finalData[amKey] = await translateText(formData[enKey], 'am');
+          finalData[amKey] = await translateWithTimeout(formData[enKey] as string, 'am');
         }
       }
 
@@ -1094,18 +1115,6 @@ export default function App() {
         }
       }
 
-      const emptyForm = {
-        id: null,
-        full_name_am: '', full_name_en: '',
-        rank_am: '', rank_en: '',
-        responsibility_am: '', responsibility_en: '',
-        phone: '', photo_url: '',
-        blood_type: '', badge_number: '',
-        gender: '', complexion: '', height: '',
-        emergency_contact_name: '', emergency_contact_phone: '',
-        commissioner_signature: '',
-        member_signature: ''
-      };
       setFormData(emptyForm);
       localStorage.removeItem('id_form_draft');
       setView('history');
@@ -2266,7 +2275,7 @@ function UserManagement() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [showAdd, setShowAdd] = useState(false);
-  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'Viewer' });
+  const [newUser, setNewUser] = useState({ email: '', password: '', role: 'Viewer' as 'Viewer' | 'Administrator' | 'Data Entry' });
 
   const fetchUsers = async () => {
     try {
@@ -2365,7 +2374,7 @@ function UserManagement() {
                 <td className="px-8 py-4 font-bold text-slate-700">{u.email || u.username}</td>
                 <td className="px-8 py-4">
                   <select 
-                    value={u.role}
+                    value={u.role || 'Viewer'}
                     onChange={(e) => handleUpdateRole(u.id, e.target.value)}
                     className="bg-slate-100 border-none rounded-lg text-xs font-bold p-2 focus:ring-2 focus:ring-blue-500"
                   >
@@ -2425,7 +2434,7 @@ function UserManagement() {
               <form onSubmit={handleAddUser} className="p-8 space-y-6">
                 <FormInput 
                   label="ኢሜይል" 
-                  value={newUser.email} 
+                  value={newUser.email || ''} 
                   onChange={(v) => setNewUser({...newUser, email: v})} 
                   placeholder="የኢሜይል አድራሻ" 
                   icon={<User size={18} />} 
@@ -2438,7 +2447,7 @@ function UserManagement() {
                     </div>
                     <input 
                       type="password" 
-                      value={newUser.password}
+                      value={newUser.password || ''}
                       onChange={(e) => setNewUser({...newUser, password: e.target.value})}
                       placeholder="የይለፍ ቃል"
                       className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
@@ -2448,8 +2457,8 @@ function UserManagement() {
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-500 ml-1">ሚና (Role)</label>
                   <select 
-                    value={newUser.role}
-                    onChange={(e) => setNewUser({...newUser, role: e.target.value})}
+                    value={newUser.role || 'Viewer'}
+                    onChange={(e) => setNewUser({...newUser, role: e.target.value as any})}
                     className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all font-bold"
                   >
                     <option value="Administrator">አስተዳዳሪ (Administrator)</option>
