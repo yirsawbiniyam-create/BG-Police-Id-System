@@ -477,9 +477,32 @@ export default function App() {
     emergency_contact_phone: '',
     commissioner_signature: '',
     member_signature: '',
-    issued_at: new Date().toISOString().split('T')[0],
-    expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
+    id_number: ''
   });
+
+  const emptyForm = {
+    id: null,
+    full_name_am: '',
+    full_name_en: '',
+    rank_am: '',
+    rank_en: '',
+    responsibility_am: '',
+    responsibility_en: '',
+    phone: '',
+    photo_url: '',
+    blood_type: '',
+    badge_number: '',
+    gender: '',
+    complexion: '',
+    height: '',
+    emergency_contact_name: '',
+    emergency_contact_phone: '',
+    commissioner_signature: '',
+    member_signature: '',
+    issued_at: new Date().toISOString().split('T')[0],
+    expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
+    id_number: ''
+  };
 
   const [isMounted, setIsMounted] = useState(false);
 
@@ -685,27 +708,30 @@ export default function App() {
             const uid = userCredential.user.uid;
             
             // Create/Update a session profile that the Security Rules can trust
-            // We use the UID as the document ID so rules can find it easily
+            // We await this to ensure security rules are satisfied before fetching data
             await setDoc(doc(db, 'profiles', uid), {
               email: userData.email,
               role: userData.role,
               active: userData.active !== false,
               last_login: new Date().toISOString()
             });
+
+            const sessionUser = {
+              id: userDoc.id,
+              email: email,
+              role: userData.role || 'Viewer'
+            };
+            
+            setUser(sessionUser as any);
+            setToken('firestore-session');
+            localStorage.setItem('police_id_session', JSON.stringify(sessionUser));
+            return;
           } catch (anonErr) {
-            console.warn("Session profile creation failed:", anonErr);
+            console.error("Session profile creation failed:", anonErr);
+            alert("Login session initialization failed. Please try again.");
+            setLoading(false);
+            return;
           }
-          
-          const sessionUser = {
-            id: userDoc.id,
-            email: email,
-            role: userData.role || 'Viewer'
-          };
-          
-          setUser(sessionUser as any);
-          setToken('firestore-session');
-          localStorage.setItem('police_id_session', JSON.stringify(sessionUser));
-          return;
         }
       }
 
@@ -931,13 +957,13 @@ export default function App() {
       let q;
       
       // Role-based filtering to satisfy Security Rules list requirements
+      // We avoid multiple field filters + orderBy to prevent "Index Required" errors
       if (user?.role === 'Administrator') {
-        q = query(idsRef, orderBy('full_name_am', 'asc'));
+        q = query(idsRef);
       } else if (user?.role === 'Data Entry') {
-        q = query(idsRef, where('created_by_email', '==', user.email), orderBy('full_name_am', 'asc'));
+        q = query(idsRef, where('created_by_email', '==', user.email));
       } else {
-        // Viewers only see approved ones
-        q = query(idsRef, where('status', '==', 'approved'), orderBy('full_name_am', 'asc'));
+        q = query(idsRef, where('status', '==', 'approved'));
       }
 
       const querySnapshot = await getDocs(q);
@@ -947,11 +973,13 @@ export default function App() {
         .filter(record => !record.deleted)
         .filter(record => {
           if (!search) return true;
-          return record.full_name_am.toLowerCase().includes(s) || 
-                 record.full_name_en.toLowerCase().includes(s) ||
-                 record.phone.includes(search) || 
-                 record.id_number.toLowerCase().includes(s);
-        }) as any[];
+          return (record.full_name_am || '').toLowerCase().includes(s) || 
+                 (record.full_name_en || '').toLowerCase().includes(s) ||
+                 (record.phone || '').includes(search) || 
+                 (record.id_number || '').toLowerCase().includes(s);
+        })
+        .sort((a, b) => (a.full_name_am || '').localeCompare(b.full_name_am || '')) as any[];
+      
       setRecords(data);
     } catch (error) {
       console.error("Fetch records error:", error);
@@ -1084,7 +1112,18 @@ export default function App() {
       fetchRecords();
     } catch (error: any) {
       console.error("Submission error:", error);
-      alert("ስህተት ተፈጥሯል! እባክዎ እንደገና ይሞክሩ። (Error: " + error.message + ")");
+      let errorMsg = error.message;
+      try {
+        const parsed = JSON.parse(error.message);
+        if (parsed.error && parsed.error.includes("insufficient permissions")) {
+          errorMsg = "አዝናለሁ! ይህን ተግባር ለማከናወን የሚያስችል በቂ ፈቃድ የለዎትም። እባክዎ እንደገና ይግቡ ወይም አስተዳዳሪውን ያነጋግሩ። (Permission Denied)";
+        }
+      } catch (e) {
+        if (error.message.includes("insufficient permissions") || error.message.includes("PERMISSION_DENIED")) {
+           errorMsg = "አዝናለሁ! ይህን ተግባር ለማከናወን የሚያስችል በቂ ፈቃድ የለዎትም። እባክዎ እንደገና ይግቡ ወይም አስተዳዳሪውን ያነጋግሩ። (Permission Denied)";
+        }
+      }
+      alert("ስህተት ተፈጥሯል! እባክዎ እንደገና ይሞክሩ። (Error: " + errorMsg + ")");
     } finally {
       setLoading(false);
       setTranslating(false);
@@ -1141,20 +1180,7 @@ export default function App() {
                     const hasData = formData.full_name_am || formData.full_name_en || formData.phone || formData.photo_url;
                     if (hasData && !formData.id && view !== 'create') {
                       if (confirm('ያልተቀመጠ መረጃ አለ። አዲስ መመዝገብ ይፈልጋሉ?')) {
-                        setFormData({
-                          id: null,
-                          full_name_am: '', full_name_en: '',
-                          rank_am: '', rank_en: '',
-                          responsibility_am: '', responsibility_en: '',
-                          phone: '', photo_url: '',
-                          blood_type: '', badge_number: '',
-                          gender: '', complexion: '', height: '',
-                          emergency_contact_name: '', emergency_contact_phone: '',
-                          commissioner_signature: '',
-                          member_signature: '',
-                          issued_at: new Date().toISOString().split('T')[0],
-                          expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
-                        });
+                        setFormData(emptyForm);
                       }
                     }
                     setView('create');
@@ -1314,18 +1340,7 @@ export default function App() {
                       type="button"
                       onClick={() => {
                         if (confirm('ፎርሙን ማጽዳት ይፈልጋሉ?')) {
-                          setFormData({
-                            id: null,
-                            full_name_am: '', full_name_en: '',
-                            rank_am: '', rank_en: '',
-                            responsibility_am: '', responsibility_en: '',
-                            phone: '', photo_url: '',
-                            blood_type: '', badge_number: '',
-                            gender: '', complexion: '', height: '',
-                            emergency_contact_name: '', emergency_contact_phone: '',
-                            commissioner_signature: '',
-                            member_signature: ''
-                          });
+                          setFormData(emptyForm);
                           localStorage.removeItem('id_form_draft');
                         }
                       }}
@@ -1588,20 +1603,7 @@ export default function App() {
                 {(user?.role === 'Administrator' || user?.role === 'Data Entry') && (
                   <button 
                     onClick={() => {
-                      setFormData({
-                        id: null,
-                        full_name_am: '', full_name_en: '',
-                        rank_am: '', rank_en: '',
-                        responsibility_am: '', responsibility_en: '',
-                        phone: '', photo_url: '',
-                        blood_type: '', badge_number: '',
-                        gender: '', complexion: '', height: '',
-                        emergency_contact_name: '', emergency_contact_phone: '',
-                        commissioner_signature: '',
-                        member_signature: '',
-                        issued_at: new Date().toISOString().split('T')[0],
-                        expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
-                      });
+                      setFormData(emptyForm);
                       setView('create');
                     }}
                     className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all"
@@ -1690,31 +1692,18 @@ export default function App() {
                             )}
                             {((user?.role === 'Administrator') || (user?.role === 'Data Entry' && record.status !== 'approved')) && (
                               <button 
-                                onClick={() => {
-                                  setFormData({
-                                    id: record.id,
-                                    full_name_am: record.full_name_am,
-                                    full_name_en: record.full_name_en,
-                                    rank_am: record.rank_am,
-                                    rank_en: record.rank_en,
-                                    responsibility_am: record.responsibility_am,
-                                    responsibility_en: record.responsibility_en,
-                                    phone: record.phone,
-                                    photo_url: record.photo_url,
-                                    blood_type: record.blood_type,
-                                    badge_number: record.badge_number,
-                                    gender: record.gender,
-                                    complexion: record.complexion,
-                                    height: record.height,
-                                    emergency_contact_name: record.emergency_contact_name,
-                                    emergency_contact_phone: record.emergency_contact_phone,
-                                    commissioner_signature: record.commissioner_signature,
-                                    member_signature: record.member_signature || '',
-                                    issued_at: record.issued_at || new Date().toISOString().split('T')[0],
-                                    expires_at: record.expires_at || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
-                                  });
-                                  setView('create');
-                                }}
+                              onClick={() => {
+                                setFormData({
+                                  ...emptyForm,
+                                  ...record,
+                                  id: record.id,
+                                  member_signature: record.member_signature || '',
+                                  issued_at: record.issued_at || new Date().toISOString().split('T')[0],
+                                  expires_at: record.expires_at || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
+                                  id_number: record.id_number || ''
+                                });
+                                setView('create');
+                              }}
                                 className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
                                 title="መረጃ አርትዕ"
                               >
@@ -1785,26 +1774,13 @@ export default function App() {
             onEdit={() => {
               if (selectedRecord) {
                 setFormData({
+                  ...emptyForm,
+                  ...selectedRecord,
                   id: selectedRecord.id,
-                  full_name_am: selectedRecord.full_name_am,
-                  full_name_en: selectedRecord.full_name_en,
-                  rank_am: selectedRecord.rank_am,
-                  rank_en: selectedRecord.rank_en,
-                  responsibility_am: selectedRecord.responsibility_am,
-                  responsibility_en: selectedRecord.responsibility_en,
-                  phone: selectedRecord.phone,
-                  photo_url: selectedRecord.photo_url,
-                  blood_type: selectedRecord.blood_type,
-                  badge_number: selectedRecord.badge_number,
-                  gender: selectedRecord.gender,
-                  complexion: selectedRecord.complexion,
-                  height: selectedRecord.height,
-                  emergency_contact_name: selectedRecord.emergency_contact_name,
-                  emergency_contact_phone: selectedRecord.emergency_contact_phone,
-                  commissioner_signature: selectedRecord.commissioner_signature,
                   member_signature: selectedRecord.member_signature || '',
                   issued_at: selectedRecord.issued_at || new Date().toISOString().split('T')[0],
-                  expires_at: selectedRecord.expires_at || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
+                  expires_at: selectedRecord.expires_at || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
+                  id_number: selectedRecord.id_number || ''
                 });
                 setShowPreview(false);
                 setView('create');
@@ -2182,7 +2158,7 @@ function FormInput({ label, value, onChange, placeholder, icon }: { label: strin
         </div>
         <input 
           type="text" 
-          value={value}
+          value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
