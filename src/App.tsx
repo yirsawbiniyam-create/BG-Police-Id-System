@@ -137,11 +137,10 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
           crossOrigin="anonymous"
         />
         <div className="flex flex-col items-center -mt-1">
-          <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center bg-[#fbbf24] shadow-sm">
             <img 
               src={assets.police_logo || "https://picsum.photos/seed/logo/120/120"} 
-              className="w-full h-full object-contain" 
-              style={{ opacity: 0.9 }}
+              className="w-full h-full object-contain mix-blend-multiply" 
               alt="Police Logo" 
               crossOrigin="anonymous"
             />
@@ -248,7 +247,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
       }}
     >
       {/* Watermark */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-[0.03] pointer-events-none">
+      <div className="absolute inset-0 flex items-center justify-center opacity-[0.08] pointer-events-none">
         <img 
           src={assets.police_logo || "https://picsum.photos/seed/logo/200/200"} 
           className="w-64 h-64 object-contain" 
