@@ -374,6 +374,54 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
 
 // --- Main App ---
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  }
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  // Keep original behavior but ensure the error log is detailed
+  throw new Error(JSON.stringify(errInfo));
+}
+
 export default function App() {
   const [user, setUser] = useState<any | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -590,9 +638,16 @@ export default function App() {
         if (userData.password === credentials.password) {
           // Success! Sign in anonymously to get a UID for rules
           try {
-            await signInAnonymously(auth);
+            const userCredential = await signInAnonymously(auth);
+            const uid = userCredential.user.uid;
+            
+            // Tag user doc with UID for rules
+            await updateDoc(userDoc.ref, { 
+              uid: uid,
+              last_login: new Date().toISOString()
+            });
           } catch (anonErr) {
-            console.warn("Anonymous sign-in failed:", anonErr);
+            console.warn("Anonymous sign-in mapping failed:", anonErr);
           }
           
           const sessionUser = {
@@ -826,7 +881,19 @@ export default function App() {
   const fetchRecords = async (search = '') => {
     setLoading(true);
     try {
-      const q = query(collection(db, 'ids'), orderBy('full_name_am', 'asc'));
+      const idsRef = collection(db, 'ids');
+      let q;
+      
+      // Role-based filtering to satisfy Security Rules list requirements
+      if (user?.role === 'Administrator') {
+        q = query(idsRef, orderBy('full_name_am', 'asc'));
+      } else if (user?.role === 'Data Entry') {
+        q = query(idsRef, where('created_by_email', '==', user.email), orderBy('full_name_am', 'asc'));
+      } else {
+        // Viewers only see approved ones
+        q = query(idsRef, where('status', '==', 'approved'), orderBy('full_name_am', 'asc'));
+      }
+
       const querySnapshot = await getDocs(q);
       const s = search.toLowerCase();
       const data = querySnapshot.docs
@@ -840,8 +907,9 @@ export default function App() {
                  record.id_number.toLowerCase().includes(s);
         }) as any[];
       setRecords(data);
-    } catch (e) {
-      console.error("Fetch records error:", e);
+    } catch (error) {
+      console.error("Fetch records error:", error);
+      handleFirestoreError(error, OperationType.LIST, 'ids');
     } finally {
       setLoading(false);
     }
@@ -905,38 +973,46 @@ export default function App() {
       const isUpdate = !!finalData.id;
 
       if (isUpdate) {
-        await updateDoc(doc(db, 'ids', finalData.id!), {
-          ...finalData,
-          photo_url,
-          commissioner_signature,
-          member_signature
-        });
-        alert("መረጃው በትክክል ተሻሽሏል! (Record updated successfully)");
-      } else {
-        const q = query(collection(db, 'ids'), orderBy('id_number', 'desc'), limit(1));
-        const querySnapshot = await getDocs(q);
-        let nextNum = 1;
-        if (!querySnapshot.empty) {
-          const lastIdNum = querySnapshot.docs[0].data().id_number;
-          // Format BGR-POL-16XXXXX
-          const match = lastIdNum.match(/BGR-POL-16(\d+)/);
-          if (match) {
-            nextNum = parseInt(match[1]) + 1;
-          }
+        try {
+          await updateDoc(doc(db, 'ids', finalData.id!), {
+            ...finalData,
+            photo_url,
+            commissioner_signature,
+            member_signature,
+            updated_at: new Date().toISOString()
+          });
+          alert("መረጃው በትክክል ተሻሽሏል! (Record updated successfully)");
+        } catch (error) {
+          handleFirestoreError(error, OperationType.UPDATE, `ids/${finalData.id}`);
         }
-        const id_number = `BGR-POL-16${String(nextNum).padStart(5, '0')}`;
+      } else {
+        try {
+          const q = query(collection(db, 'ids'), orderBy('id_number', 'desc'), limit(1));
+          const querySnapshot = await getDocs(q);
+          let nextNum = 1;
+          if (!querySnapshot.empty) {
+            const lastIdNum = querySnapshot.docs[0].data().id_number;
+            const match = lastIdNum.match(/BGR-POL-16(\d+)/);
+            if (match) {
+              nextNum = parseInt(match[1]) + 1;
+            }
+          }
+          const id_number = `BGR-POL-16${String(nextNum).padStart(5, '0')}`;
 
-        await addDoc(collection(db, 'ids'), {
-          ...finalData,
-          id_number,
-          photo_url,
-          commissioner_signature,
-          member_signature,
-          status: user?.role === 'Administrator' ? 'approved' : 'pending',
-          created_by_email: user?.email,
-          created_at: new Date().toISOString()
-        });
-        alert("መታወቂያው በትክክል ተመዝግቧል! (ID registered successfully)");
+          await addDoc(collection(db, 'ids'), {
+            ...finalData,
+            id_number,
+            photo_url,
+            commissioner_signature,
+            member_signature,
+            status: user?.role === 'Administrator' ? 'approved' : 'pending',
+            created_by_email: user?.email,
+            created_at: new Date().toISOString()
+          });
+          alert("መታወቂያው በትክክል ተመዝግቧል! (ID registered successfully)");
+        } catch (error) {
+          handleFirestoreError(error, OperationType.CREATE, 'ids');
+        }
       }
 
       const emptyForm = {
