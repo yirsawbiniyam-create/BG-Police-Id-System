@@ -32,7 +32,8 @@ import {
   onSnapshot,
   setDoc,
   getDoc,
-  limit
+  limit,
+  or
 } from 'firebase/firestore';
 
 // --- Types ---
@@ -429,6 +430,7 @@ export default function App() {
   const [view, setView] = useState<'dashboard' | 'create' | 'history' | 'verify' | 'maintenance' | 'users'>('dashboard');
   const [searchQuery, setSearchQuery] = useState('');
   const [records, setRecords] = useState<IDRecord[]>([]);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [assets, setAssets] = useState<Assets>({});
   const [loading, setLoading] = useState(false);
   const [translating, setTranslating] = useState(false);
@@ -614,7 +616,7 @@ export default function App() {
       fetchAssets();
       fetchRecords();
     }
-  }, [user]);
+  }, [user, statusFilter]);
 
   // Auto-save draft
   useEffect(() => {
@@ -962,11 +964,13 @@ export default function App() {
       let q;
       
       // Role-based filtering to satisfy Security Rules list requirements
-      // We avoid multiple field filters + orderBy to prevent "Index Required" errors
       if (user?.role === 'Administrator') {
         q = query(idsRef);
       } else if (user?.role === 'Data Entry') {
-        q = query(idsRef, where('created_by_email', '==', user.email));
+        q = query(idsRef, or(
+          where('created_by_email', '==', user.email),
+          where('status', '==', 'approved')
+        ));
       } else {
         q = query(idsRef, where('status', '==', 'approved'));
       }
@@ -977,13 +981,20 @@ export default function App() {
         .map(doc => ({ ...(doc.data() as any), id: doc.id }))
         .filter(record => !record.deleted)
         .filter(record => {
+          if (statusFilter !== 'all' && record.status !== statusFilter) return false;
           if (!search) return true;
           return (record.full_name_am || '').toLowerCase().includes(s) || 
                  (record.full_name_en || '').toLowerCase().includes(s) ||
                  (record.phone || '').includes(search) || 
                  (record.id_number || '').toLowerCase().includes(s);
         })
-        .sort((a, b) => (a.full_name_am || '').localeCompare(b.full_name_am || '')) as any[];
+        .sort((a, b) => {
+          const statusOrder = { 'pending': 0, 'approved': 1, 'rejected': 2 };
+          if (a.status !== b.status) {
+            return (statusOrder[a.status as keyof typeof statusOrder] || 0) - (statusOrder[b.status as keyof typeof statusOrder] || 0);
+          }
+          return (b.created_at || '').localeCompare(a.created_at || '');
+        }) as any[];
       
       setRecords(data);
     } catch (error) {
@@ -1607,20 +1618,37 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="space-y-6"
             >
-              <div className="flex justify-between items-center">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <h2 className="text-2xl font-bold text-slate-900">የአባላት መዝገብ</h2>
-                {(user?.role === 'Administrator' || user?.role === 'Data Entry') && (
-                  <button 
-                    onClick={() => {
-                      setFormData(emptyForm);
-                      setView('create');
-                    }}
-                    className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all"
-                  >
-                    <Plus size={20} />
-                    አዲስ አባል
-                  </button>
-                )}
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex bg-slate-100 p-1 rounded-xl">
+                    {(['all', 'pending', 'approved', 'rejected'] as const).map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setStatusFilter(s)}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          statusFilter === s 
+                            ? 'bg-white text-blue-600 shadow-sm' 
+                            : 'text-slate-500 hover:text-slate-700'
+                        }`}
+                      >
+                        {s === 'all' ? 'ሁሉም' : s === 'pending' ? 'በጥበቃ' : s === 'approved' ? 'የጸደቁ' : 'ውድቅ'}
+                      </button>
+                    ))}
+                  </div>
+                  {(user?.role === 'Administrator' || user?.role === 'Data Entry') && (
+                    <button 
+                      onClick={() => {
+                        setFormData(emptyForm);
+                        setView('create');
+                      }}
+                      className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all"
+                    >
+                      <Plus size={20} />
+                      አዲስ አባል
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
@@ -1736,7 +1764,7 @@ export default function App() {
                             >
                               <Eye size={18} />
                             </button>
-                            {((user?.role === 'Administrator') || (user?.role === 'Data Entry' && record.status === 'approved')) && (
+                            {((user?.role === 'Administrator') || (user?.role === 'Data Entry' && record.status === 'approved')) ? (
                               <button 
                                 onClick={() => {
                                   setSelectedRecord(record);
@@ -1747,6 +1775,10 @@ export default function App() {
                               >
                                 <Printer size={18} />
                               </button>
+                            ) : user?.role === 'Data Entry' && (
+                              <div className="p-2 text-slate-300 cursor-not-allowed" title="አስተዳዳሪው እስኪያጸድቀው ማተም አይቻልም (Cannot print until approved)">
+                                <Printer size={18} />
+                              </div>
                             )}
                             {user?.role === 'Administrator' && (
                               <button 
