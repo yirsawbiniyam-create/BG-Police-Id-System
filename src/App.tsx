@@ -61,12 +61,15 @@ interface IDRecord {
   issued_at: string;
   expires_at: string;
   deleted?: boolean;
+  status: 'pending' | 'approved' | 'rejected';
+  created_by_email?: string;
 }
 
 interface User {
   id: string;
   email: string;
   role: 'Administrator' | 'Data Entry' | 'Viewer';
+  active?: boolean;
 }
 
 interface Assets {
@@ -267,10 +270,10 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             <div className="flex-1 h-[0.3mm] bg-gradient-to-r from-red-600/40 to-transparent"></div>
           </div>
           <p className="text-[7.5px] font-black leading-tight text-justify" style={{ color: '#000000' }}>
-            ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
+            ይህ የመታወቂያ ካርድ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን ንብረት ነው፡፡ ይህንን መታወቂያ የያዘ ግለሰብ የኮሚሽኑ የፖሊስ አባል በመሆኑ ሕግን የማስከበርና የማስገደድ ሙሉ ሥልጣን ተሰጥቶታል፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
           </p>
           <p className="text-[6.5px] font-extrabold italic leading-tight text-justify" style={{ color: '#1e293b' }}>
-            The Bearer of this ID card member of Police and is authorized to enforce the Law. He is obliged to this ID card.  If found, please return it to the nearest police station.
+            This identity card is the property of the BGR Police Commission. The holder is a member of the police commission and is fully authorized to enforce the law. If found, please return it to the nearest police station.
           </p>
         </div>
 
@@ -511,8 +514,11 @@ export default function App() {
   });
 
   const handlePrintSide = (side: 'front' | 'back' | 'both' | 'combined') => {
-    if (user?.role !== 'Administrator') {
-      alert("Only Administrators can print ID cards.");
+    const isApproved = selectedRecord?.status === 'approved';
+    const canPrint = user?.role === 'Administrator' || (user?.role === 'Data Entry' && isApproved);
+    
+    if (!canPrint) {
+      alert("You do not have permission to print this record. Only Administrators or approved records can be printed.");
       return;
     }
     setLoading(true);
@@ -575,6 +581,12 @@ export default function App() {
         const userDoc = querySnapshot.docs[0];
         const userData = userDoc.data();
         
+        if (userData.active === false) {
+          alert("Your account has been deactivated. Please contact the Administrator.");
+          setLoading(false);
+          return;
+        }
+
         if (userData.password === credentials.password) {
           // Success! Sign in anonymously to get a UID for rules
           try {
@@ -627,7 +639,10 @@ export default function App() {
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('online');
 
   const handleDownload = async (idNumber: string, side: 'front' | 'back' | 'both' | 'combined') => {
-    if (user?.role !== 'Administrator') {
+    const isApproved = selectedRecord?.status === 'approved';
+    const canDownload = user?.role === 'Administrator' || (user?.role === 'Data Entry' && isApproved);
+    
+    if (!canDownload) {
       alert("ዳታውን ማውረድ የሚችለው አድሚን ብቻ ነው። (Only Administrators can download ID cards.)");
       return;
     }
@@ -917,6 +932,8 @@ export default function App() {
           photo_url,
           commissioner_signature,
           member_signature,
+          status: user?.role === 'Administrator' ? 'approved' : 'pending',
+          created_by_email: user?.email,
           created_at: new Date().toISOString()
         });
         alert("መታወቂያው በትክክል ተመዝግቧል! (ID registered successfully)");
@@ -1475,7 +1492,7 @@ export default function App() {
                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Member</th>
                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ID Number</th>
                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rank & Responsibility</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Phone</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
                     </tr>
                   </thead>
@@ -1488,6 +1505,9 @@ export default function App() {
                             <div>
                               <p className="text-sm font-bold text-slate-900">{record.full_name_am}</p>
                               <p className="text-xs text-slate-500 uppercase">{record.full_name_en}</p>
+                              {record.created_by_email && (
+                                <p className="text-[9px] text-slate-400 font-medium">By: {record.created_by_email}</p>
+                              )}
                             </div>
                           </div>
                         </td>
@@ -1500,10 +1520,48 @@ export default function App() {
                           <p className="text-sm font-medium text-slate-700">{record.rank_am}</p>
                           <p className="text-xs text-slate-400">{record.responsibility_en}</p>
                         </td>
-                        <td className="px-6 py-4 text-sm text-slate-600">{record.phone}</td>
+                        <td className="px-6 py-4">
+                          {record.status === 'approved' ? (
+                            <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 w-fit">
+                              <Check size={10} /> Approved
+                            </span>
+                          ) : record.status === 'rejected' ? (
+                            <span className="px-2 py-1 bg-red-50 text-red-700 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 w-fit">
+                              <X size={10} /> Rejected
+                            </span>
+                          ) : (
+                            <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 w-fit">
+                              <RefreshCw size={10} className="animate-spin-slow" /> Pending
+                            </span>
+                          )}
+                        </td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {user?.role !== 'Viewer' && (
+                            {user?.role === 'Administrator' && record.status === 'pending' && (
+                              <>
+                                <button 
+                                  onClick={async () => {
+                                    await updateDoc(doc(db, 'ids', record.id), { status: 'approved' });
+                                    fetchRecords();
+                                  }}
+                                  className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                  title="Approve"
+                                >
+                                  <Check size={18} />
+                                </button>
+                                <button 
+                                  onClick={async () => {
+                                    await updateDoc(doc(db, 'ids', record.id), { status: 'rejected' });
+                                    fetchRecords();
+                                  }}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                                  title="Reject"
+                                >
+                                  <X size={18} />
+                                </button>
+                              </>
+                            )}
+                            {((user?.role === 'Administrator') || (user?.role === 'Data Entry' && record.status === 'pending')) && (
                               <button 
                                 onClick={() => {
                                   setFormData({
@@ -1552,7 +1610,7 @@ export default function App() {
                             >
                               <Eye size={18} />
                             </button>
-                            {user?.role === 'Administrator' && (
+                            {((user?.role === 'Administrator') || (user?.role === 'Data Entry' && record.status === 'approved')) && (
                               <button 
                                 onClick={() => {
                                   setSelectedRecord(record);
@@ -1624,7 +1682,7 @@ export default function App() {
                 setView('create');
               }
             }}
-            userRole={user?.role}
+            user={user}
           />
         )}
       </AnimatePresence>
@@ -1751,8 +1809,9 @@ export default function App() {
 
 // --- Helper Components ---
 
-function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, userRole }: { record: IDRecord, assets: Assets, onClose: () => void, onPrint: (side: 'front' | 'back' | 'both' | 'combined') => void, onDownload: (side: 'front' | 'back' | 'both' | 'combined') => void, onEdit: () => void, userRole?: string }) {
+function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, user }: { record: IDRecord, assets: Assets, onClose: () => void, onPrint: (side: 'front' | 'back' | 'both' | 'combined') => void, onDownload: (side: 'front' | 'back' | 'both' | 'combined') => void, onEdit: () => void, user: User | null }) {
   const [activeTab, setActiveTab] = useState<'front' | 'back' | 'both' | 'combined'>('both');
+  const canPrint = user?.role === 'Administrator' || (user?.role === 'Data Entry' && record.status === 'approved');
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
@@ -1813,7 +1872,7 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
             <div className={`space-y-6 flex flex-col items-center w-full lg:w-auto ${activeTab === 'back' || activeTab === 'combined' ? 'hidden lg:flex opacity-0 pointer-events-none absolute' : 'flex'}`}>
               <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Front Side / የፊት ገፅ</span>
-                {userRole === 'Administrator' && (
+                {canPrint && (
                   <div className="flex gap-2">
                     <button 
                       onClick={() => onPrint('front')}
@@ -1841,7 +1900,7 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
             <div className={`space-y-6 flex flex-col items-center w-full lg:w-auto ${activeTab === 'front' || activeTab === 'combined' ? 'hidden lg:flex opacity-0 pointer-events-none absolute' : 'flex'}`}>
               <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Back Side / የጀርባ ገፅ</span>
-                {userRole === 'Administrator' && (
+                {canPrint && (
                   <div className="flex gap-2">
                     <button 
                       onClick={() => onPrint('back')}
@@ -1883,7 +1942,7 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
 
         <div className="p-8 bg-white border-t border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex gap-2">
-            {userRole === 'Administrator' && (
+            {(user?.role === 'Administrator' || (user?.role === 'Data Entry' && record.status === 'pending')) && (
               <button 
                 onClick={onEdit}
                 className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all flex items-center gap-2"
@@ -1900,7 +1959,7 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
             </button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            {userRole === 'Administrator' && (
+            {canPrint && (
               <>
                 <button 
                   onClick={() => onDownload('both')}
@@ -2122,6 +2181,7 @@ function UserManagement() {
         email: newUser.email,
         password: newUser.password,
         role: newUser.role,
+        active: true,
         created_at: new Date().toISOString()
       });
       fetchUsers();
@@ -2154,6 +2214,15 @@ function UserManagement() {
     }
   };
 
+  const handleToggleActive = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, 'users', id), { active: !currentStatus });
+      fetchUsers();
+    } catch (e) {
+      alert('Error updating status');
+    }
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-center">
@@ -2176,7 +2245,7 @@ function UserManagement() {
             <tr className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50/50">
               <th className="px-8 py-4">Email</th>
               <th className="px-8 py-4">Role</th>
-              <th className="px-8 py-4">Created At</th>
+              <th className="px-8 py-4">Status</th>
               <th className="px-8 py-4 text-right">Actions</th>
             </tr>
           </thead>
@@ -2195,8 +2264,17 @@ function UserManagement() {
                     <option value="Viewer">Viewer</option>
                   </select>
                 </td>
-                <td className="px-8 py-4 text-slate-500 text-sm">
-                  {isMounted ? new Date(u.created_at).toLocaleDateString() : ''}
+                <td className="px-8 py-4">
+                  <button
+                    onClick={() => handleToggleActive(u.id, u.active !== false)}
+                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
+                      u.active !== false 
+                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100' 
+                        : 'bg-red-50 text-red-700 hover:bg-red-100'
+                    }`}
+                  >
+                    {u.active !== false ? 'Active' : 'Inactive'}
+                  </button>
                 </td>
                 <td className="px-8 py-4 text-right">
                   <button 
