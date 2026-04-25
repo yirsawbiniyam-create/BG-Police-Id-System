@@ -270,10 +270,10 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             <div className="flex-1 h-[0.3mm] bg-gradient-to-r from-red-600/40 to-transparent"></div>
           </div>
           <p className="text-[7.5px] font-black leading-tight text-justify" style={{ color: '#000000' }}>
-            ይህ የመታወቂያ ካርድ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን ንብረት ነው፡፡ ይህንን መታወቂያ የያዘ ግለሰብ የኮሚሽኑ የፖሊስ አባል በመሆኑ ሕግን የማስከበርና የማስገደድ ሙሉ ሥልጣን ተሰጥቶታል፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
+            ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡  መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
           </p>
           <p className="text-[6.5px] font-extrabold italic leading-tight text-justify" style={{ color: '#1e293b' }}>
-            This identity card is the property of the BGR Police Commission. The holder is a member of the police commission and is fully authorized to enforce the law. If found, please return it to the nearest police station.
+            The Bearer of this ID card member of Police and is authorized to enforce the Law. He is obliged to this ID card.  If found, please return it to the nearest police station.
           </p>
         </div>
 
@@ -514,8 +514,9 @@ export default function App() {
             console.warn("Profile fetch restricted or failed:", e);
           }
  
-          const isAdminEmail = firebaseUser.email?.toLowerCase() === 'policeregion551@gmail.com' || 
-                               firebaseUser.email?.toLowerCase() === 'yirsawbiniyam@gmail.com';
+          const emailLower = firebaseUser.email?.toLowerCase() || '';
+          const isAdminEmail = emailLower === 'policeregion551@gmail.com' || 
+                               emailLower === 'yirsawbiniyam@gmail.com';
           
           let role = isAdminEmail ? 'Administrator' : 'Viewer';
           let email = firebaseUser.email || 'Unknown';
@@ -524,7 +525,7 @@ export default function App() {
             // Find user in virtual 'users' collection or create default
             let foundInUsers = false;
             try {
-              const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email));
+              const q = query(collection(db, 'users'), where('email', '==', email));
               const userSnapshot = await getDocs(q);
               
               if (!userSnapshot.empty) {
@@ -561,8 +562,9 @@ export default function App() {
           });
         } catch (err) {
           console.error("Auth state profile fetch/sync error:", err);
-          const isAdminEmail = firebaseUser.email?.toLowerCase() === 'policeregion551@gmail.com' || 
-                               firebaseUser.email?.toLowerCase() === 'yirsawbiniyam@gmail.com';
+          const emailLower = firebaseUser.email?.toLowerCase() || '';
+          const isAdminEmail = emailLower === 'policeregion551@gmail.com' || 
+                               emailLower === 'yirsawbiniyam@gmail.com';
           setUser({
             id: firebaseUser.uid,
             email: firebaseUser.email || 'Unknown',
@@ -1126,14 +1128,14 @@ export default function App() {
             </div>
             
             <div className="hidden md:flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
-              <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<Shield size={18} />} label="Dashboard" />
+              <NavButton active={view === 'dashboard'} onClick={() => setView('dashboard')} icon={<Shield size={18} />} label="ዳሽቦርድ" />
               {(user?.role === 'Administrator' || user?.role === 'Data Entry') && (
                 <NavButton 
                   active={view === 'create'} 
                   onClick={() => {
                     const hasData = formData.full_name_am || formData.full_name_en || formData.phone || formData.photo_url;
                     if (hasData && !formData.id && view !== 'create') {
-                      if (confirm('ያልተቀመጠ መረጃ አለ። አዲስ መመዝገብ ይፈልጋሉ? (You have unsaved data. Do you want to start a new registration?)')) {
+                      if (confirm('ያልተቀመጠ መረጃ አለ። አዲስ መመዝገብ ይፈልጋሉ?')) {
                         setFormData({
                           id: null,
                           full_name_am: '', full_name_en: '',
@@ -1153,14 +1155,14 @@ export default function App() {
                     setView('create');
                   }} 
                   icon={<Plus size={18} />} 
-                  label="New ID" 
+                  label="አዲስ መታወቂያ" 
                 />
               )}
-              <NavButton active={view === 'history'} onClick={() => setView('history')} icon={<History size={18} />} label="Records" />
+              <NavButton active={view === 'history'} onClick={() => setView('history')} icon={<History size={18} />} label="መዝገቦች" />
               {user?.role === 'Administrator' && (
                 <>
-                  <NavButton active={view === 'maintenance'} onClick={() => setView('maintenance')} icon={<DbIcon size={18} />} label="Maintenance" />
-                  <NavButton active={view === 'users'} onClick={() => setView('users')} icon={<User size={18} />} label="Users" />
+                  <NavButton active={view === 'maintenance'} onClick={() => setView('maintenance')} icon={<DbIcon size={18} />} label="ጥገና" />
+                  <NavButton active={view === 'users'} onClick={() => setView('users')} icon={<User size={18} />} label="ተጠቃሚዎች" />
                 </>
               )}
             </div>
@@ -1170,7 +1172,7 @@ export default function App() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                 <input 
                   type="text" 
-                  placeholder="Search records..." 
+                  placeholder="መረጃዎችን ፈልግ..." 
                   className="pl-10 pr-4 py-2 bg-slate-100 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 w-64 transition-all"
                   value={searchQuery}
                   onChange={(e) => {
@@ -1186,12 +1188,12 @@ export default function App() {
                 </div>
                 <div className="text-right hidden sm:block">
                   <p className="text-xs font-bold text-slate-900">{user?.username}</p>
-                  <p className="text-[10px] text-slate-500 font-medium">{user?.role}</p>
+                  <p className="text-[10px] text-slate-500 font-medium">{user?.role === 'Administrator' ? 'አስተዳዳሪ' : user?.role === 'Data Entry' ? 'መረጃ አስገቢ' : 'ተመልካች'}</p>
                 </div>
                 <button 
                   onClick={handleLogout}
                   className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                  title="Logout"
+                  title="መውጣት"
                 >
                   <X size={20} />
                 </button>
@@ -1251,29 +1253,29 @@ export default function App() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <StatCard title="Total IDs" value={records.length} icon={<User className="text-blue-600" />} />
-                <StatCard title="Recent Scans" value="24" icon={<Eye className="text-emerald-600" />} />
-                <StatCard title="System Status" value="Active" icon={<Check className="text-blue-600" />} />
+                <StatCard title="ጠቅላላ መታወቂያዎች" value={records.length} icon={<User className="text-blue-600" />} />
+                <StatCard title="የቅርብ ጊዜ ፍተሻዎች" value="24" icon={<Eye className="text-emerald-600" />} />
+                <StatCard title="የሲስተም ሁኔታ" value="ገባሪ" icon={<Check className="text-blue-600" />} />
               </div>
 
               <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
                 <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                   <Camera size={24} className="text-blue-600" />
-                  System Assets Configuration
+                  የሲስተም ፋይሎች ማስተካከያ (System Assets)
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
                   <AssetUpload 
-                    label="BGR Flag" 
+                    label="የቢጂአር ሰንደቅ አላማ" 
                     image={assets.bgr_flag} 
                     onUpload={(e) => handleAssetUpload('bgr_flag', e)} 
                   />
                   <AssetUpload 
-                    label="Police Logo" 
+                    label="የፖሊስ ዓርማ" 
                     image={assets.police_logo} 
                     onUpload={(e) => handleAssetUpload('police_logo', e)} 
                   />
                   <AssetUpload 
-                    label="Ethiopian Flag" 
+                    label="የኢትዮጵያ ሰንደቅ አላማ" 
                     image={assets.eth_flag} 
                     onUpload={(e) => handleAssetUpload('eth_flag', e)} 
                   />
@@ -1293,12 +1295,12 @@ export default function App() {
               <div className="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-100">
                 <div className="p-8 bg-blue-600 text-white flex justify-between items-center">
                   <div>
-                    <h2 className="text-2xl font-bold">{formData.id ? 'Edit Member ID' : 'Create New Member ID'}</h2>
-                    <p className="text-blue-100 text-sm">{formData.id ? 'Update member details' : 'Fill in the details. Missing translations will be generated automatically.'}</p>
+                    <h2 className="text-2xl font-bold">{formData.id ? 'የአባል መረጃ አርትዕ' : 'አዲስ የአባል መታወቂያ መመዝገቢያ'}</h2>
+                    <p className="text-blue-100 text-sm">{formData.id ? 'የአባሉን መረጃ እዚህ ያሻሽሉ' : 'መረጃዎችን በትክክል ያስገቡ። የተተዉ ትርጉሞች በራሳቸው ይሞላሉ።'}</p>
                     {localStorage.getItem('id_form_draft') && !formData.id && (
                       <div className="mt-2 inline-flex items-center gap-2 px-3 py-1 bg-blue-500/30 rounded-full text-[10px] font-bold uppercase tracking-wider">
                         <DbIcon size={12} />
-                        Draft Loaded from Storage
+                        ረቂቅ መረጃ ተገኝቷል (Draft Loaded)
                       </div>
                     )}
                   </div>
@@ -1306,7 +1308,7 @@ export default function App() {
                     <button 
                       type="button"
                       onClick={() => {
-                        if (confirm('ፎርሙን ማጽዳት ይፈልጋሉ? (Are you sure you want to clear the form?)')) {
+                        if (confirm('ፎርሙን ማጽዳት ይፈልጋሉ?')) {
                           setFormData({
                             id: null,
                             full_name_am: '', full_name_en: '',
@@ -1325,7 +1327,7 @@ export default function App() {
                       className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
                     >
                       <Trash2 size={14} />
-                      Clear Form
+                      ፎርሙን አጽዳ (Clear)
                     </button>
                   )}
                 </div>
@@ -1333,27 +1335,27 @@ export default function App() {
                 <form onSubmit={handleSubmit} className="p-8 space-y-6">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      <FormInput label="Full Name (Amharic)" value={formData.full_name_am} onChange={(v) => setFormData({...formData, full_name_am: v})} placeholder="ሙሉ ስም" icon={<User size={18}/>} />
+                      <FormInput label="ሙሉ ስም (በአማርኛ)" value={formData.full_name_am} onChange={(v) => setFormData({...formData, full_name_am: v})} placeholder="ሙሉ ስም" icon={<User size={18}/>} />
                       <FormInput label="Full Name (English)" value={formData.full_name_en} onChange={(v) => setFormData({...formData, full_name_en: v})} placeholder="Full Name" icon={<User size={18}/>} />
                       <div className="grid grid-cols-2 gap-4">
-                        <FormInput label="Rank (Amharic)" value={formData.rank_am} onChange={(v) => setFormData({...formData, rank_am: v})} placeholder="ማዕረግ" icon={<Award size={18}/>} />
+                        <FormInput label="ማዕረግ (በአማርኛ)" value={formData.rank_am} onChange={(v) => setFormData({...formData, rank_am: v})} placeholder="ማዕረግ" icon={<Award size={18}/>} />
                         <FormInput label="Rank (English)" value={formData.rank_en} onChange={(v) => setFormData({...formData, rank_en: v})} placeholder="Rank" icon={<Award size={18}/>} />
                       </div>
                       <div className="grid grid-cols-2 gap-4">
-                        <FormInput label="Responsibility (Amharic)" value={formData.responsibility_am} onChange={(v) => setFormData({...formData, responsibility_am: v})} placeholder="ሀላፊነት" icon={<Briefcase size={18}/>} />
+                        <FormInput label="ኃላፊነት (በአማርኛ)" value={formData.responsibility_am} onChange={(v) => setFormData({...formData, responsibility_am: v})} placeholder="ኃላፊነት" icon={<Briefcase size={18}/>} />
                         <FormInput label="Responsibility (English)" value={formData.responsibility_en} onChange={(v) => setFormData({...formData, responsibility_en: v})} placeholder="Responsibility" icon={<Briefcase size={18}/>} />
                       </div>
-                      <FormInput label="Phone Number" value={formData.phone} onChange={(v) => setFormData({...formData, phone: v})} placeholder="+251..." icon={<Phone size={18}/>} />
+                      <FormInput label="ስልክ ቁጥር" value={formData.phone} onChange={(v) => setFormData({...formData, phone: v})} placeholder="+251..." icon={<Phone size={18}/>} />
                       
                       <div className="pt-4 border-t border-slate-100">
-                        <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-4">Front Side Details & Dates</h4>
+                        <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-4">የፊት ለፊት መረጃዎች እና ቀናት</h4>
                         <div className="grid grid-cols-2 gap-4">
-                          <FormInput label="Blood Type" value={formData.blood_type} onChange={(v) => setFormData({...formData, blood_type: v})} placeholder="A+, B-, etc." icon={<Check size={18}/>} />
-                          <FormInput label="Badge Number" value={formData.badge_number} onChange={(v) => setFormData({...formData, badge_number: v})} placeholder="Badge #" icon={<Shield size={18}/>} />
+                          <FormInput label="የደም ዓይነት" value={formData.blood_type} onChange={(v) => setFormData({...formData, blood_type: v})} placeholder="A+, B-, ወዘተ" icon={<Check size={18}/>} />
+                          <FormInput label="የጡረታ መለያ ቁጥር (Badge)" value={formData.badge_number} onChange={(v) => setFormData({...formData, badge_number: v})} placeholder="መለያ ቁጥር" icon={<Shield size={18}/>} />
                         </div>
                         <div className="grid grid-cols-2 gap-4 mt-4">
                           <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-500 ml-1">Issued Date</label>
+                            <label className="text-xs font-bold text-slate-500 ml-1">የተሰጠበት ቀን</label>
                             <input 
                               type="date" 
                               value={formData.issued_at}
@@ -1362,7 +1364,7 @@ export default function App() {
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-500 ml-1">Expiry Date</label>
+                            <label className="text-xs font-bold text-slate-500 ml-1">የሚያበቃበት ቀን</label>
                             <input 
                               type="date" 
                               value={formData.expires_at}
@@ -1374,15 +1376,15 @@ export default function App() {
                       </div>
 
                       <div className="pt-4 border-t border-slate-100">
-                        <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-4">Back Side Details</h4>
+                        <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-4">የጀርባ ገጽ መረጃዎች</h4>
                         <div className="grid grid-cols-3 gap-4">
-                          <FormInput label="Gender" value={formData.gender} onChange={(v) => setFormData({...formData, gender: v})} placeholder="M/F" icon={<User size={18}/>} />
-                          <FormInput label="Complexion" value={formData.complexion} onChange={(v) => setFormData({...formData, complexion: v})} placeholder="Brown, etc." icon={<Eye size={18}/>} />
-                          <FormInput label="Height" value={formData.height} onChange={(v) => setFormData({...formData, height: v})} placeholder="1.75m" icon={<Plus size={18}/>} />
+                          <FormInput label="ጾታ" value={formData.gender} onChange={(v) => setFormData({...formData, gender: v})} placeholder="ወ/ሴ" icon={<User size={18}/>} />
+                          <FormInput label="መልክ" value={formData.complexion} onChange={(v) => setFormData({...formData, complexion: v})} placeholder="ጠይም፣ ወዘተ" icon={<Eye size={18}/>} />
+                          <FormInput label="ቁመት" value={formData.height} onChange={(v) => setFormData({...formData, height: v})} placeholder="1.75ሜ" icon={<Plus size={18}/>} />
                         </div>
                         <div className="grid grid-cols-2 gap-4 mt-4">
-                          <FormInput label="Emergency Contact Name" value={formData.emergency_contact_name} onChange={(v) => setFormData({...formData, emergency_contact_name: v})} placeholder="Name" icon={<User size={18}/>} />
-                          <FormInput label="Emergency Contact Phone" value={formData.emergency_contact_phone} onChange={(v) => setFormData({...formData, emergency_contact_phone: v})} placeholder="Phone" icon={<Phone size={18}/>} />
+                          <FormInput label="የአደጋ ጊዜ ተጠሪ ስም" value={formData.emergency_contact_name} onChange={(v) => setFormData({...formData, emergency_contact_name: v})} placeholder="ስም" icon={<User size={18}/>} />
+                          <FormInput label="የአደጋ ጊዜ ተጠሪ ስልክ" value={formData.emergency_contact_phone} onChange={(v) => setFormData({...formData, emergency_contact_phone: v})} placeholder="ስልክ" icon={<Phone size={18}/>} />
                         </div>
                       </div>
                     </div>
@@ -1412,7 +1414,7 @@ export default function App() {
                       </div>
 
                       <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-                        <p className="text-xs font-bold text-slate-500 mb-3">Member Signature / የአባሉ ፊርማ</p>
+                        <p className="text-xs font-bold text-slate-500 mb-3">የአባሉ ፊርማ</p>
                         <div className="w-full h-24 bg-white rounded-2xl shadow-sm overflow-hidden border-2 border-white relative group flex items-center justify-center">
                           {formData.member_signature ? (
                             <img src={formData.member_signature} className="h-full object-contain" alt="Member Signature Preview" />
@@ -1422,7 +1424,7 @@ export default function App() {
                                 <Plus size={24} />
                                 <Camera size={24} />
                               </div>
-                              <span className="text-[10px] font-medium">Upload or Take Photo / አፕሎድ ወይም ፎቶ</span>
+                              <span className="text-[10px] font-medium">ፎቶ ይጫኑ ወይም ያንሱ</span>
                             </div>
                           )}
                           <input 
@@ -1444,7 +1446,7 @@ export default function App() {
                       </div>
 
                       <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-                        <p className="text-xs font-bold text-slate-500 mb-3">Commissioner Signature / የኮሚሽነሩ ፊርማ</p>
+                        <p className="text-xs font-bold text-slate-500 mb-3">የኮሚሽነሩ ፊርማ</p>
                         <div className="w-full h-24 bg-white rounded-2xl shadow-sm overflow-hidden border-2 border-white relative group flex items-center justify-center">
                           {formData.commissioner_signature ? (
                             <img src={formData.commissioner_signature} className="h-full object-contain" alt="Signature Preview" />
@@ -1454,7 +1456,7 @@ export default function App() {
                                 <Plus size={24} />
                                 <Camera size={24} />
                               </div>
-                              <span className="text-[10px] font-medium">Upload or Take Photo / አፕሎድ ወይም ፎቶ</span>
+                              <span className="text-[10px] font-medium">ፎቶ ይጫኑ ወይም ያንሱ</span>
                             </div>
                           )}
                           <input 
@@ -1483,7 +1485,7 @@ export default function App() {
                       onClick={() => setView('dashboard')}
                       className="px-8 py-3 rounded-2xl font-bold text-slate-600 hover:bg-slate-100 transition-all"
                     >
-                      Cancel
+                      ይቅር (Cancel)
                     </button>
                     <button 
                       type="submit"
@@ -1491,7 +1493,7 @@ export default function App() {
                       className="px-10 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2 disabled:opacity-50"
                     >
                       {(loading || translating) && <Loader2 className="animate-spin" size={18} />}
-                      {translating ? 'Translating...' : (formData.id ? 'Update Member ID' : 'Generate ID Card')}
+                      {translating ? 'እየተተረጎመ...' : (formData.id ? 'መረጃ አሻሽል' : 'መታወቂያ አዘጋጅ')}
                     </button>
                   </div>
                 </form>
@@ -1509,8 +1511,8 @@ export default function App() {
             >
               <div className="flex justify-between items-center">
                 <div>
-                  <h2 className="text-3xl font-bold">System Maintenance</h2>
-                  <p className="text-slate-500">Manage system assets and integrity</p>
+                  <h2 className="text-3xl font-bold">የሲስተም ጥገና</h2>
+                  <p className="text-slate-500">የሲስተም ፋይሎችን እና ደህንነትን ይቆጣጠሩ</p>
                 </div>
               </div>
 
@@ -1518,24 +1520,24 @@ export default function App() {
                 <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
                   <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
                     <DbIcon size={20} className="text-blue-600" />
-                    <h3 className="font-bold">Storage Configuration</h3>
+                    <h3 className="font-bold">የመረጃ ማስቀመጫ</h3>
                   </div>
                   <div className="p-6 space-y-4">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-500 font-medium">Database Type</span>
+                      <span className="text-sm text-slate-500 font-medium">የመረጃ ቋት ዓይነት</span>
                       <span className="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700">
                         Firebase Firestore
                       </span>
                     </div>
                     <div className="flex justify-between items-center">
-                      <span className="text-sm text-slate-500 font-medium">Persistence</span>
+                      <span className="text-sm text-slate-500 font-medium">የመረጃ ቆይታ</span>
                       <span className="px-3 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
                         Permanent
                       </span>
                     </div>
                     <div className="p-4 bg-blue-50/50 rounded-2xl border border-blue-100">
                       <p className="text-xs text-blue-700 leading-relaxed">
-                        System is currently using Firebase for all data and assets. Backups and data management can be handled directly through the Firebase Console.
+                        ሲስተሙ በአሁኑ ጊዜ ፋየርቤዝን (Firebase) እየተጠቀመ ነው። የውሂብ አስተዳደርን በቀጥታ በፋየርቤዝ ኮንሶል በኩል ማከናወን ይቻላል።
                       </p>
                     </div>
                   </div>
@@ -1544,21 +1546,21 @@ export default function App() {
                 <div className="bg-white rounded-[32px] shadow-sm border border-slate-100 overflow-hidden">
                   <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
                     <Award size={20} className="text-blue-600" />
-                    <h3 className="font-bold">System Assets</h3>
+                    <h3 className="font-bold">የሲስተም ፋይሎች</h3>
                   </div>
                   <div className="p-6 space-y-4">
                     <div className="space-y-2">
-                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">Commissioner Signature</label>
+                      <label className="text-xs font-black text-slate-400 uppercase tracking-widest">የኮሚሽነሩ ፊርማ</label>
                       <div className="flex items-center gap-4">
                         <div className="flex-1 h-24 bg-slate-50 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden">
                           {assets.commissioner_signature ? (
                             <img src={assets.commissioner_signature} className="h-full object-contain" alt="Signature" />
                           ) : (
-                            <span className="text-xs text-slate-400">No signature uploaded</span>
+                            <span className="text-xs text-slate-400">ምንም ፊርማ አልተጫነም</span>
                           )}
                         </div>
                         <label className="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-xl text-xs font-bold cursor-pointer transition-all">
-                          Upload
+                          ጫን (Upload)
                           <input type="file" className="hidden" accept="image/*" onChange={(e) => handleAssetUpload('commissioner_signature', e)} />
                         </label>
                       </div>
@@ -1577,7 +1579,7 @@ export default function App() {
               className="space-y-6"
             >
               <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-slate-900">Member Records</h2>
+                <h2 className="text-2xl font-bold text-slate-900">የአባላት መዝገብ</h2>
                 {(user?.role === 'Administrator' || user?.role === 'Data Entry') && (
                   <button 
                     onClick={() => {
@@ -1600,7 +1602,7 @@ export default function App() {
                     className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all"
                   >
                     <Plus size={20} />
-                    New Member
+                    አዲስ አባል
                   </button>
                 )}
               </div>
@@ -1609,11 +1611,11 @@ export default function App() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-100">
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Member</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ID Number</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Rank & Responsibility</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Actions</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">አባል</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">መታወቂያ ቁጥር</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ማዕረግ እና ኃላፊነት</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">ሁኔታ</th>
+                      <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">ተግባራት</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1626,7 +1628,7 @@ export default function App() {
                               <p className="text-sm font-bold text-slate-900">{record.full_name_am}</p>
                               <p className="text-xs text-slate-500 uppercase">{record.full_name_en}</p>
                               {record.created_by_email && (
-                                <p className="text-[9px] text-slate-400 font-medium">By: {record.created_by_email}</p>
+                                <p className="text-[9px] text-slate-400 font-medium">ተመዝጋቢ፡ {record.created_by_email}</p>
                               )}
                             </div>
                           </div>
@@ -1643,15 +1645,15 @@ export default function App() {
                         <td className="px-6 py-4">
                           {record.status === 'approved' ? (
                             <span className="px-2 py-1 bg-emerald-50 text-emerald-700 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 w-fit">
-                              <Check size={10} /> Approved
+                              <Check size={10} /> ጸድቋል
                             </span>
                           ) : record.status === 'rejected' ? (
                             <span className="px-2 py-1 bg-red-50 text-red-700 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 w-fit">
-                              <X size={10} /> Rejected
+                              <X size={10} /> ውድቅ ተደርጓል
                             </span>
                           ) : (
                             <span className="px-2 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 w-fit">
-                              <RefreshCw size={10} className="animate-spin-slow" /> Pending
+                              <RefreshCw size={10} className="animate-spin-slow" /> በጥበቃ ላይ
                             </span>
                           )}
                         </td>
@@ -1665,7 +1667,7 @@ export default function App() {
                                     fetchRecords();
                                   }}
                                   className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                  title="Approve"
+                                  title="አጽድቅ"
                                 >
                                   <Check size={18} />
                                 </button>
@@ -1675,7 +1677,7 @@ export default function App() {
                                     fetchRecords();
                                   }}
                                   className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                  title="Reject"
+                                  title="ውድቅ አድርግ"
                                 >
                                   <X size={18} />
                                 </button>
@@ -1709,7 +1711,7 @@ export default function App() {
                                   setView('create');
                                 }}
                                 className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
-                                title="Edit Record"
+                                title="መረጃ አርትዕ"
                               >
                                 <Edit size={18} />
                               </button>
@@ -1717,7 +1719,7 @@ export default function App() {
                             <button 
                               onClick={() => fetchScans(record.id_number)}
                               className="p-2 text-slate-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-all"
-                              title="View Scan History"
+                              title="የፍተሻ ታሪክ"
                             >
                               <History size={18} />
                             </button>
@@ -1727,6 +1729,7 @@ export default function App() {
                                 setShowPreview(true);
                               }}
                               className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                              title="እይታ"
                             >
                               <Eye size={18} />
                             </button>
@@ -1737,7 +1740,7 @@ export default function App() {
                                   handlePrintSide('both');
                                 }}
                                 className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                                title="Print ID"
+                                title="መታወቂያ አትም"
                               >
                                 <Printer size={18} />
                               </button>
@@ -1746,7 +1749,7 @@ export default function App() {
                               <button 
                                 onClick={() => handleDeleteRecord(record.id)}
                                 className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                                title="Delete Record"
+                                title="መረጃ አጥፋ"
                               >
                                 <Trash2 size={18} />
                               </button>
@@ -1825,14 +1828,14 @@ export default function App() {
               className="relative bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden"
             >
               <div className="p-6 border-b border-slate-100 flex justify-between items-center">
-                <h3 className="text-xl font-bold">Verification History</h3>
+                <h3 className="text-xl font-bold">የማረጋገጫ ታሪክ</h3>
                 <button onClick={() => setShowScans(false)} className="p-2 hover:bg-slate-100 rounded-full transition-all">
                   <X size={20} />
                 </button>
               </div>
               <div className="p-6 max-h-[60vh] overflow-y-auto">
                 {scanHistory.length === 0 ? (
-                  <p className="text-center text-slate-500 py-8">No scans recorded yet.</p>
+                  <p className="text-center text-slate-500 py-8">ምንም የተመዘገበ ፍተሻ የለም።</p>
                 ) : (
                   <div className="space-y-4">
                     {scanHistory.map((scan) => (
@@ -1950,8 +1953,8 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
       >
         <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between items-center gap-4 bg-white sticky top-0 z-10">
           <div>
-            <h3 className="text-xl font-bold">ID Card Detailed Preview</h3>
-            <p className="text-xs text-slate-500">Inspect front and back sides before printing</p>
+            <h3 className="text-xl font-bold">የመታወቂያ ካርድ ዝርዝር እይታ</h3>
+            <p className="text-xs text-slate-500">ከማተምዎ በፊት የፊት እና የጀርባ ገጾችን ያረጋግጡ</p>
           </div>
           
           <div className="flex bg-slate-100 p-1 rounded-xl">
@@ -1959,25 +1962,25 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
               onClick={() => setActiveTab('front')}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'front' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              Front
+              ፊት (Front)
             </button>
             <button 
               onClick={() => setActiveTab('back')}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'back' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              Back
+              ጀርባ (Back)
             </button>
             <button 
               onClick={() => setActiveTab('both')}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'both' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              Both Sides
+              ሁለቱም ገጽ
             </button>
             <button 
               onClick={() => setActiveTab('combined')}
               className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeTab === 'combined' ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
             >
-              Combined
+              የተቀናጀ
             </button>
           </div>
 
@@ -2068,14 +2071,14 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
                 className="px-6 py-3 bg-slate-100 text-slate-600 rounded-2xl font-bold hover:bg-slate-200 transition-all flex items-center gap-2"
               >
                 <Edit size={18} />
-                Edit
+                አርትዕ (Edit)
               </button>
             )}
             <button 
               onClick={onClose}
               className="w-full sm:w-auto px-8 py-3 rounded-2xl font-bold text-slate-600 hover:bg-slate-100 transition-all"
             >
-              Back to Records
+              ወደ መዝገቦች ተመለስ (Back)
             </button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
@@ -2086,21 +2089,21 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
                   className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl"
                 >
                   <Download size={24} />
-                  Download Full (Front & Back)
+                  ሁለቱንም ገጽ አውርድ
                 </button>
                 <button 
                   onClick={() => onPrint('combined')}
                   className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-2xl shadow-[#0596694d] hover:bg-emerald-700 transition-all flex items-center justify-center gap-3"
                 >
                   <Printer size={24} />
-                  Print Combined
+                  የተቀናጀ አትም (Print)
                 </button>
                 <button 
                   onClick={() => onPrint('both')}
                   className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-2xl shadow-[#2563eb4d] hover:bg-blue-700 transition-all flex items-center justify-center gap-3"
                 >
                   <Printer size={24} />
-                  Print Both Sides Together
+                  ሁለቱንም ገጽ አትም
                 </button>
               </>
             )}
@@ -2150,7 +2153,7 @@ function AssetUpload({ label, image, onUpload }: { label: string, image?: string
           <Camera size={24} className="text-slate-300" />
         )}
         <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-          <span className="text-white text-xs font-bold">Change Asset</span>
+          <span className="text-white text-xs font-bold">ፋይሉን ቀይር (Change)</span>
         </div>
         <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={onUpload} />
       </div>
@@ -2225,14 +2228,14 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
         
         <form onSubmit={handleSubmit} className="p-10 space-y-6">
           <FormInput 
-            label="Email" 
+            label="ኢሜይል (Email)" 
             value={email} 
             onChange={setEmail} 
-            placeholder="Enter email" 
+            placeholder="ኢሜይል ያስገቡ" 
             icon={<User size={18} />} 
           />
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-500 ml-1">Password</label>
+            <label className="text-xs font-bold text-slate-500 ml-1">የይለፍ ቃል (Password)</label>
             <div className="relative">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                 <Shield size={18} />
@@ -2241,7 +2244,7 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
                 type="password" 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Enter password"
+                placeholder="የይለፍ ቃል ያስገቡ"
                 className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
               />
             </div>
@@ -2252,7 +2255,7 @@ function Login({ onLogin, loading, serverStatus, dbStatus }: { onLogin: (c: any)
             className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {loading && <Loader2 className="animate-spin" size={18} />}
-            Sign In
+            ይግቡ
           </button>
           <div className="text-center pt-4 border-t border-slate-100">
             <p className="text-[10px] font-bold text-slate-900 leading-relaxed">
@@ -2316,12 +2319,12 @@ function UserManagement() {
   };
 
   const handleDeleteUser = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+    if (!confirm('ይህንን ተጠቃሚ ማጥፋት እንደሚፈልጉ እርግጠኛ ነዎት?')) return;
     try {
       await deleteDoc(doc(db, 'users', id));
       fetchUsers();
     } catch (e) {
-      alert('Error deleting user');
+      alert('ተጠቃሚውን ሲያጠፉ ስህተት ተከስቷል');
     }
   };
 
@@ -2330,7 +2333,7 @@ function UserManagement() {
       await updateDoc(doc(db, 'users', id), { role });
       fetchUsers();
     } catch (e) {
-      alert('Error updating role');
+      alert('ሚናውን ሲቀይሩ ስህተት ተከስቷል');
     }
   };
 
@@ -2339,7 +2342,7 @@ function UserManagement() {
       await updateDoc(doc(db, 'users', id), { active: !currentStatus });
       fetchUsers();
     } catch (e) {
-      alert('Error updating status');
+      alert('ሁኔታውን ሲቀይሩ ስህተት ተከስቷል');
     }
   };
 
@@ -2347,15 +2350,15 @@ function UserManagement() {
     <div className="space-y-8">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold">User Management</h2>
-          <p className="text-slate-500">Manage system access and roles</p>
+          <h2 className="text-3xl font-bold">የተጠቃሚዎች አስተዳደር</h2>
+          <p className="text-slate-500">የሲስተም መግቢያ ፍቃዶችን እና ሚናዎችን ይቆጣጠሩ</p>
         </div>
         <button 
           onClick={() => setShowAdd(true)}
           className="px-6 py-3 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center gap-2"
         >
           <Plus size={20} />
-          Add New User
+          አዲስ ተጠቃሚ ጨምር
         </button>
       </div>
 
@@ -2363,10 +2366,10 @@ function UserManagement() {
         <table className="w-full text-left">
           <thead>
             <tr className="text-xs font-bold text-slate-400 uppercase tracking-widest border-b border-slate-100 bg-slate-50/50">
-              <th className="px-8 py-4">Email</th>
-              <th className="px-8 py-4">Role</th>
-              <th className="px-8 py-4">Status</th>
-              <th className="px-8 py-4 text-right">Actions</th>
+              <th className="px-8 py-4">ኢሜይል</th>
+              <th className="px-8 py-4">ሚና</th>
+              <th className="px-8 py-4">ሁኔታ</th>
+              <th className="px-8 py-4 text-right">ተግባራት</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -2379,9 +2382,9 @@ function UserManagement() {
                     onChange={(e) => handleUpdateRole(u.id, e.target.value)}
                     className="bg-slate-100 border-none rounded-lg text-xs font-bold p-2 focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="Administrator">Administrator</option>
-                    <option value="Data Entry">Data Entry</option>
-                    <option value="Viewer">Viewer</option>
+                    <option value="Administrator">አስተዳዳሪ</option>
+                    <option value="Data Entry">መረጃ አስገቢ</option>
+                    <option value="Viewer">ተመልካች</option>
                   </select>
                 </td>
                 <td className="px-8 py-4">
@@ -2393,7 +2396,7 @@ function UserManagement() {
                         : 'bg-red-50 text-red-700 hover:bg-red-100'
                     }`}
                   >
-                    {u.active !== false ? 'Active' : 'Inactive'}
+                    {u.active !== false ? 'ገባሪ' : 'ያልነቃ'}
                   </button>
                 </td>
                 <td className="px-8 py-4 text-right">
@@ -2538,8 +2541,8 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
       <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6">
         <X size={40} />
       </div>
-      <h1 className="text-2xl font-bold text-slate-900">Invalid ID Card</h1>
-      <p className="text-slate-500 mt-2">This ID record could not be found in our secure database.</p>
+      <h1 className="text-2xl font-bold text-slate-900">ልክ ያልሆነ መታወቂያ</h1>
+      <p className="text-slate-500 mt-2">ይህ መታወቂያ በመረጃ ቋታችን ውስጥ አልተገኘም።</p>
     </div>
   );
 
