@@ -56,7 +56,11 @@ interface IDRecord {
   emergency_contact_name: string;
   emergency_contact_phone: string;
   commissioner_signature: string;
+  member_signature?: string;
   created_at: string;
+  issued_at: string;
+  expires_at: string;
+  deleted?: boolean;
 }
 
 interface User {
@@ -115,17 +119,17 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
       style={{ 
         printColorAdjust: 'exact',
         WebkitPrintColorAdjust: 'exact',
-        background: 'linear-gradient(135deg, #fcd34d 0%, #fffbeb 40%, #ffffff 60%, #dbeafe 100%)',
+        background: 'linear-gradient(135deg, #fbbf24 0%, #fcd34d 40%, #ffedd5 60%, #fff7ed 100%)',
         border: 'none'
       }}
     >
       {/* Background Pattern / Security Element */}
-      <div className="absolute inset-0 opacity-[0.03] pointer-events-none flex items-center justify-center">
+      <div className="absolute inset-0 opacity-[0.05] pointer-events-none flex items-center justify-center">
         <Shield size={200} style={{ color: '#1e3a8a' }} />
       </div>
 
       {/* Header */}
-      <div className="relative z-10 flex justify-between items-start h-12 px-2 pt-1">
+      <div className="relative z-10 flex justify-between items-start h-12 px-2 pt-1 pb-1 border-b border-black/10">
         <img 
           src={assets.bgr_flag || "https://picsum.photos/seed/bgr/100/60"} 
           className="h-7 w-12 object-cover rounded-sm shadow-sm" 
@@ -133,7 +137,7 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
           crossOrigin="anonymous"
         />
         <div className="flex flex-col items-center -mt-1">
-          <div className="w-14 h-14 rounded-full overflow-hidden flex items-center justify-center">
+          <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center">
             <img 
               src={assets.police_logo || "https://picsum.photos/seed/logo/120/120"} 
               className="w-full h-full object-contain" 
@@ -152,70 +156,75 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
       </div>
 
       {/* Commission Name */}
-      <div className="relative z-10 text-center mb-0.5 mt-1">
-        <h1 className="text-[8px] font-extrabold leading-none tracking-tight" style={{ color: '#1e3a8a' }}>የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
-        <h2 className="text-[6px] font-bold uppercase tracking-tighter leading-none mt-0.5" style={{ color: '#1e40af' }}>Benishangul-Gumuz Region Police Commission</h2>
-        <div className="mt-0.5 border-t pt-0.5 flex justify-center gap-3" style={{ borderTopColor: 'rgba(30, 58, 138, 0.2)' }}>
-          <p className="text-[8px] font-black tracking-widest leading-none" style={{ color: '#dc2626' }}>የመታወቂያ ካርድ</p>
-          <p className="text-[6px] font-bold uppercase tracking-widest leading-none self-center" style={{ color: '#1e3a8a' }}>IDENTITY CARD</p>
-        </div>
+      <div className="relative z-10 text-center mb-0.5 mt-0.5">
+        <h1 className="text-[7px] font-extrabold leading-none tracking-tight" style={{ color: '#000000' }}>የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
+        <h2 className="text-[5.5px] font-bold uppercase tracking-tighter leading-none mt-0.5" style={{ color: '#111827' }}>Benishangul-Gumuz Region Police Commission</h2>
       </div>
 
       {/* Main Content Area */}
-      <div className="relative z-10 flex flex-1 gap-1.5 px-1 overflow-hidden">
+      <div className="relative z-10 flex flex-1 gap-1 px-1 overflow-hidden">
         {/* Left Column: Details */}
-        <div className="w-[55mm] flex flex-col justify-center py-0.5">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 px-2 py-0.5 rounded-md border shadow-sm" style={{ backgroundColor: '#1e3a8a', borderColor: '#1e3a8a' }}>
-              <span className="text-[4.5px] font-bold uppercase whitespace-nowrap" style={{ color: 'rgba(255, 255, 255, 0.8)' }}>ID NO / መታወቂያ ቁጥር:</span>
-              <span className="text-[9px] font-black text-white tracking-wider">{data.id_number || "BGR-POL-00000"}</span>
+        <div className="w-[56mm] flex flex-col justify-center py-0.5">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm bg-black/5 border border-black/10">
+              <span className="text-[4px] font-bold uppercase text-slate-600">ID NO:</span>
+              <span className="text-[8px] font-black text-black tracking-wider">{data.id_number || "BGR-POL-1600000"}</span>
             </div>
             
-            <div className="p-1 rounded-md border-l-2" style={{ backgroundColor: 'rgba(219, 234, 254, 0.5)', borderLeftColor: '#2563eb' }}>
-              <div className="text-[4.5px] font-bold uppercase" style={{ color: 'rgba(30, 58, 138, 0.6)' }}>FULL NAME / ሙሉ ስም</div>
-              <div className="text-[9px] font-bold leading-tight truncate" style={{ color: '#0f172a' }}>{data.full_name_am}</div>
-              <div className="text-[7.5px] font-semibold uppercase leading-tight truncate" style={{ color: '#334155' }}>{data.full_name_en}</div>
+            <div className="p-1 rounded-sm border-l-2 bg-white/40" style={{ borderLeftColor: '#1e3a8a' }}>
+              <div className="text-[4px] font-bold uppercase text-slate-500">FULL NAME / ሙሉ ስም</div>
+              <div className="text-[8px] font-bold leading-tight truncate text-black">{data.full_name_am}</div>
+              <div className="text-[6.5px] font-semibold uppercase leading-tight truncate text-slate-700">{data.full_name_en}</div>
             </div>
 
-            <div className="grid grid-cols-1 gap-0.5">
+            <div className="grid grid-cols-2 gap-1">
               <div>
-                <div className="text-[4.5px] font-bold uppercase" style={{ color: 'rgba(30, 58, 138, 0.6)' }}>RANK / ማዕረግ</div>
-                <div className="text-[7.5px] font-bold truncate" style={{ color: '#0f172a' }}>{data.rank_am} / <span className="text-[6.5px] font-medium uppercase" style={{ color: '#475569' }}>{data.rank_en}</span></div>
+                <div className="text-[4px] font-bold uppercase text-slate-500">RANK / ማዕረግ</div>
+                <div className="text-[6.5px] font-bold truncate text-black">{data.rank_am} / <span className="text-[5.5px] font-medium uppercase">{data.rank_en}</span></div>
+              </div>
+              <div>
+                <div className="text-[4px] font-bold uppercase text-slate-500">RESPONSIBILITY / ሀላፊነት</div>
+                <div className="text-[6.5px] font-bold truncate text-black">{data.responsibility_am}</div>
               </div>
             </div>
 
-            <div>
-              <div className="text-[4.5px] font-bold uppercase" style={{ color: 'rgba(30, 58, 138, 0.6)' }}>RESPONSIBILITY / ሀላፊነት</div>
-              <div className="text-[7.5px] font-bold truncate" style={{ color: '#0f172a' }}>{data.responsibility_am} / {data.responsibility_en}</div>
+            <div className="grid grid-cols-2 gap-1 mt-1 pt-1 border-t border-black/5">
+              <div>
+                <div className="text-[4px] font-bold uppercase text-slate-500">Issued Date / የተሰጠበት ቀን</div>
+                <div className="text-[6px] font-bold text-black">{data.issued_at || "N/A"}</div>
+              </div>
+              <div>
+                <div className="text-[4px] font-bold uppercase text-slate-500">Expiry Date / የሚያበቃበት ቀን</div>
+                <div className="text-[6px] font-bold text-red-600">{data.expires_at || "N/A"}</div>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Right Column: Photo */}
-        <div className="w-[22mm] flex flex-col items-center justify-center">
-          <div className="w-[20mm] h-[25mm] bg-white border-2 rounded-lg overflow-hidden shadow-md relative" style={{ borderColor: '#f59e0b' }}>
+        <div className="w-[21mm] flex flex-col items-center justify-center">
+          <div className="w-[19mm] h-[24mm] bg-white border rounded-sm overflow-hidden shadow-sm relative border-slate-300">
             {data.photo_url ? (
               <img 
                 src={data.photo_url} 
-                className="w-full h-full object-contain bg-slate-50" 
+                className="w-full h-full object-cover" 
                 alt="Member" 
                 crossOrigin="anonymous"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-amber-200">
-                <User size={35} />
+              <div className="w-full h-full flex items-center justify-center text-slate-200">
+                <User size={30} />
               </div>
             )}
           </div>
-          <div className="mt-0.5 text-[5px] font-bold uppercase tracking-widest" style={{ color: 'rgba(30, 58, 138, 0.4)' }}>Official Photo</div>
         </div>
       </div>
 
       {/* Footer Accent */}
-      <div className="absolute bottom-0 left-0 right-0 h-1.5 flex" style={{ backgroundColor: '#1e3a8a' }}>
-        <div className="h-full w-1/3" style={{ backgroundColor: '#facc15' }}></div>
-        <div className="h-full w-1/3" style={{ backgroundColor: '#16a34a' }}></div>
-        <div className="h-full w-1/3" style={{ backgroundColor: '#1e3a8a' }}></div>
+      <div className="absolute bottom-0 left-0 right-0 h-1 flex" style={{ backgroundColor: '#1e3a8a' }}>
+        <div className="h-full w-1/3" style={{ backgroundColor: '#009a44' }}></div>
+        <div className="h-full w-1/3" style={{ backgroundColor: '#fedd00' }}></div>
+        <div className="h-full w-1/3" style={{ backgroundColor: '#ef3340' }}></div>
       </div>
     </div>
   );
@@ -258,83 +267,98 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             </div>
             <div className="flex-1 h-[0.3mm] bg-gradient-to-r from-red-600/40 to-transparent"></div>
           </div>
-          <p className="text-[7px] font-extrabold leading-tight text-justify" style={{ color: '#0f172a' }}>
+          <p className="text-[7.5px] font-black leading-tight text-justify" style={{ color: '#000000' }}>
             ይህ የመታወቂያ ካርድ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን ንብረት ነው፡፡ ይህንን መታወቂያ የያዘ ግለሰብ የኮሚሽኑ የፖሊስ አባል በመሆኑ ሕግን የማስከበርና የማስገደድ ሙሉ ሥልጣን ተሰጥቶታል፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
           </p>
-          <p className="text-[6px] font-bold italic leading-tight text-justify" style={{ color: '#64748b' }}>
+          <p className="text-[6.5px] font-extrabold italic leading-tight text-justify" style={{ color: '#1e293b' }}>
             This identity card is the property of the BGR Police Commission. The holder is a member of the police commission and is fully authorized to enforce the law. If found, please return it to the nearest police station.
           </p>
         </div>
 
         {/* Middle: Details in Two Lines */}
-        <div className="py-1 flex flex-col gap-0.5 border-b" style={{ borderBottomColor: '#f1f5f9' }}>
+        <div className="py-1 flex flex-col gap-0.5 border-b" style={{ borderBottomColor: '#cbd5e1' }}>
           <div className="flex items-center justify-center gap-2.5">
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>ፆታ / GENDER:</span>
-              <span className="text-[6.5px] font-black" style={{ color: '#1e293b' }}>{data.gender || "N/A"}</span>
+              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ፆታ / GENDER:</span>
+              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.gender || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>ቁመት / HEIGHT:</span>
-              <span className="text-[6.5px] font-black" style={{ color: '#1e293b' }}>{data.height || "N/A"}</span>
+              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ቁመት / HEIGHT:</span>
+              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.height || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>መልክ / COMPLEXION:</span>
-              <span className="text-[6.5px] font-black" style={{ color: '#1e293b' }}>{data.complexion || "N/A"}</span>
+              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>መልክ / COMPLEXION:</span>
+              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.complexion || "N/A"}</span>
             </div>
           </div>
           <div className="flex items-center justify-center gap-2.5">
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>ስልክ / PHONE:</span>
-              <span className="text-[6.5px] font-black" style={{ color: '#1d4ed8' }}>{data.phone || "N/A"}</span>
+              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ስልክ / PHONE:</span>
+              <span className="text-[7px] font-black" style={{ color: '#1d4ed8' }}>{data.phone || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>ደም / BLOOD:</span>
-              <span className="text-[6.5px] font-black" style={{ color: '#dc2626' }}>{data.blood_type || "N/A"}</span>
+              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ደም / BLOOD:</span>
+              <span className="text-[7px] font-black" style={{ color: '#dc2626' }}>{data.blood_type || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-bold uppercase" style={{ color: '#94a3b8' }}>ጡረታ / BADGE:</span>
-              <span className="text-[6.5px] font-black" style={{ color: '#1e293b' }}>{data.badge_number || "N/A"}</span>
+              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ጡረታ / BADGE:</span>
+              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.badge_number || "N/A"}</span>
             </div>
           </div>
         </div>
 
-        {/* Bottom: QR, Emergency, Signature */}
-        <div className="h-[24mm] flex items-center justify-between pt-1">
-          {/* QR Code (Even Larger) */}
+        {/* Bottom: QR and Signatures */}
+        <div className="h-[22mm] flex items-end justify-between gap-2 mt-auto">
+          {/* QR Code */}
           <div className="flex flex-col items-center gap-0.5">
-            <div className="p-1.5 bg-white border rounded-lg shadow-md" style={{ borderColor: '#e2e8f0' }}>
+            <div className="p-1 bg-white border rounded-md shadow-sm" style={{ borderColor: '#cbd5e1' }}>
               <QRCodeSVG 
                 value={`${isMounted ? window.location.origin : ''}/verify/${data.id_number}`} 
-                size={85} 
-                level="H"
+                size={72} 
+                level="M"
               />
             </div>
-            <span className="text-[5px] font-black tracking-tighter" style={{ color: '#1e3a8a' }}>{data.id_number}</span>
+            <span className="text-[5px] font-black tracking-tighter" style={{ color: '#000000' }}>{data.id_number}</span>
           </div>
 
-          {/* Emergency Contact */}
-          <div className="flex flex-col items-center text-center px-2 border-x h-full justify-center" style={{ borderLeftColor: '#f1f5f9', borderRightColor: '#f1f5f9' }}>
-            <span className="text-[4px] font-bold uppercase mb-0.5" style={{ color: '#94a3b8' }}>Emergency Contact</span>
-            <span className="text-[6px] font-bold leading-tight truncate max-w-[25mm]" style={{ color: '#1e293b' }}>{data.emergency_contact_name || "N/A"}</span>
-            <span className="text-[6.5px] font-black" style={{ color: '#1d4ed8' }}>{data.emergency_contact_phone || "N/A"}</span>
-          </div>
-
-          {/* Signature */}
-          <div className="flex flex-col items-center w-[25mm]">
-            <div className="h-12 w-full flex items-center justify-center relative">
-              {data.commissioner_signature ? (
-                <img 
-                  src={data.commissioner_signature} 
-                  className="h-full w-full object-contain" 
-                  alt="Signature" 
-                  crossOrigin="anonymous"
-                />
-              ) : (
-                <div className="w-full border-b mb-1" style={{ borderBottomColor: '#cbd5e1' }}></div>
-              )}
+          {/* Signatures Container - Side by Side */}
+          <div className="flex flex-1 items-end justify-around pb-1">
+            {/* Member Signature */}
+            <div className="flex flex-col items-center w-[26mm]">
+              <div className="h-10 w-full flex items-center justify-center relative border-b border-black/30">
+                {data.member_signature ? (
+                  <img 
+                    src={data.member_signature} 
+                    className="h-full w-full object-contain filter contrast-125 brightness-90" 
+                    alt="Member Signature" 
+                    crossOrigin="anonymous"
+                  />
+                ) : (
+                  <div className="w-full mb-1"></div>
+                )}
+              </div>
+              <div className="text-[4px] font-black uppercase text-center leading-none mt-1" style={{ color: '#000000' }}>
+                Member's Signature<br/>የአባሉ ፊርማ
+              </div>
             </div>
-            <div className="text-[4px] font-bold uppercase text-center leading-none mt-1" style={{ color: '#94a3b8' }}>
-              Commissioner Signature<br/>የኮሚሽነሩ ፊርማ
+
+            {/* Commissioner Signature */}
+            <div className="flex flex-col items-center w-[26mm]">
+              <div className="h-10 w-full flex items-center justify-center relative border-b border-black/30">
+                {data.commissioner_signature ? (
+                  <img 
+                    src={data.commissioner_signature} 
+                    className="h-full w-full object-contain filter contrast-125 brightness-90" 
+                    alt="Commissioner Signature" 
+                    crossOrigin="anonymous"
+                  />
+                ) : (
+                  <div className="w-full mb-1"></div>
+                )}
+              </div>
+              <div className="text-[4px] font-black uppercase text-center leading-none mt-1" style={{ color: '#000000' }}>
+                Commissioner Signature<br/>የኮሚሽነሩ ፊርማ
+              </div>
             </div>
           </div>
         </div>
@@ -381,6 +405,9 @@ export default function App() {
     emergency_contact_name: string;
     emergency_contact_phone: string;
     commissioner_signature: string;
+    member_signature: string;
+    issued_at: string;
+    expires_at: string;
   }>({
     id: null,
     full_name_am: '',
@@ -398,7 +425,10 @@ export default function App() {
     height: '',
     emergency_contact_name: '',
     emergency_contact_phone: '',
-    commissioner_signature: ''
+    commissioner_signature: '',
+    member_signature: '',
+    issued_at: new Date().toISOString().split('T')[0],
+    expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
   });
 
   const [isMounted, setIsMounted] = useState(false);
@@ -482,6 +512,10 @@ export default function App() {
   });
 
   const handlePrintSide = (side: 'front' | 'back' | 'both' | 'combined') => {
+    if (user?.role !== 'Administrator') {
+      alert("Only Administrators can print ID cards.");
+      return;
+    }
     setLoading(true);
     setPrintSide(side);
     
@@ -594,6 +628,10 @@ export default function App() {
   const [serverStatus, setServerStatus] = useState<'checking' | 'online' | 'offline'>('online');
 
   const handleDownload = async (idNumber: string, side: 'front' | 'back' | 'both' | 'combined') => {
+    if (user?.role !== 'Administrator') {
+      alert("ዳታውን ማውረድ የሚችለው አድሚን ብቻ ነው። (Only Administrators can download ID cards.)");
+      return;
+    }
     setLoading(true);
     let captureContainer: HTMLDivElement | null = null;
     
@@ -774,22 +812,19 @@ export default function App() {
   const fetchRecords = async (search = '') => {
     setLoading(true);
     try {
-      let q;
-      if (search) {
-        // Simple search by full name (case sensitive in Firestore)
-        q = query(
-          collection(db, 'ids'), 
-          where('full_name_am', '>=', search), 
-          where('full_name_am', '<=', search + '\uf8ff'),
-          orderBy('full_name_am', 'asc')
-        );
-      } else {
-        q = query(collection(db, 'ids'), orderBy('full_name_am', 'asc'));
-      }
+      const q = query(collection(db, 'ids'), orderBy('full_name_am', 'asc'));
       const querySnapshot = await getDocs(q);
+      const s = search.toLowerCase();
       const data = querySnapshot.docs
         .map(doc => ({ ...(doc.data() as any), id: doc.id }))
-        .filter(record => !record.deleted) as any[]; // Filter out soft-deleted records
+        .filter(record => !record.deleted)
+        .filter(record => {
+          if (!search) return true;
+          return record.full_name_am.toLowerCase().includes(s) || 
+                 record.full_name_en.toLowerCase().includes(s) ||
+                 record.phone.includes(search) || 
+                 record.id_number.toLowerCase().includes(s);
+        }) as any[];
       setRecords(data);
     } catch (e) {
       console.error("Fetch records error:", e);
@@ -851,6 +886,7 @@ export default function App() {
 
       let photo_url = finalData.photo_url;
       let commissioner_signature = finalData.commissioner_signature;
+      let member_signature = finalData.member_signature;
 
       const isUpdate = !!finalData.id;
 
@@ -858,30 +894,33 @@ export default function App() {
         await updateDoc(doc(db, 'ids', finalData.id!), {
           ...finalData,
           photo_url,
-          commissioner_signature
+          commissioner_signature,
+          member_signature
         });
-        alert("መረጃው በትክክል ተሻሽሏል!");
+        alert("መረጃው በትክክል ተሻሽሏል! (Record updated successfully)");
       } else {
         const q = query(collection(db, 'ids'), orderBy('id_number', 'desc'), limit(1));
         const querySnapshot = await getDocs(q);
         let nextNum = 1;
         if (!querySnapshot.empty) {
           const lastIdNum = querySnapshot.docs[0].data().id_number;
-          const match = lastIdNum.match(/BGR-POL-(\d+)/);
+          // Format BGR-POL-16XXXXX
+          const match = lastIdNum.match(/BGR-POL-16(\d+)/);
           if (match) {
             nextNum = parseInt(match[1]) + 1;
           }
         }
-        const id_number = `BGR-POL-${String(nextNum).padStart(5, '0')}`;
+        const id_number = `BGR-POL-16${String(nextNum).padStart(5, '0')}`;
 
         await addDoc(collection(db, 'ids'), {
           ...finalData,
           id_number,
           photo_url,
           commissioner_signature,
+          member_signature,
           created_at: new Date().toISOString()
         });
-        alert("መታወቂያው በትክክል ተመዝግቧል!");
+        alert("መታወቂያው በትክክል ተመዝግቧል! (ID registered successfully)");
       }
 
       const emptyForm = {
@@ -893,7 +932,8 @@ export default function App() {
         blood_type: '', badge_number: '',
         gender: '', complexion: '', height: '',
         emergency_contact_name: '', emergency_contact_phone: '',
-        commissioner_signature: ''
+        commissioner_signature: '',
+        member_signature: ''
       };
       setFormData(emptyForm);
       localStorage.removeItem('id_form_draft');
@@ -967,7 +1007,10 @@ export default function App() {
                           blood_type: '', badge_number: '',
                           gender: '', complexion: '', height: '',
                           emergency_contact_name: '', emergency_contact_phone: '',
-                          commissioner_signature: ''
+                          commissioner_signature: '',
+                          member_signature: '',
+                          issued_at: new Date().toISOString().split('T')[0],
+                          expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
                         });
                       }
                     }
@@ -1137,7 +1180,8 @@ export default function App() {
                             blood_type: '', badge_number: '',
                             gender: '', complexion: '', height: '',
                             emergency_contact_name: '', emergency_contact_phone: '',
-                            commissioner_signature: ''
+                            commissioner_signature: '',
+                            member_signature: ''
                           });
                           localStorage.removeItem('id_form_draft');
                         }
@@ -1166,10 +1210,30 @@ export default function App() {
                       <FormInput label="Phone Number" value={formData.phone} onChange={(v) => setFormData({...formData, phone: v})} placeholder="+251..." icon={<Phone size={18}/>} />
                       
                       <div className="pt-4 border-t border-slate-100">
-                        <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-4">Front Side Details</h4>
+                        <h4 className="text-xs font-black text-blue-900 uppercase tracking-widest mb-4">Front Side Details & Dates</h4>
                         <div className="grid grid-cols-2 gap-4">
                           <FormInput label="Blood Type" value={formData.blood_type} onChange={(v) => setFormData({...formData, blood_type: v})} placeholder="A+, B-, etc." icon={<Check size={18}/>} />
                           <FormInput label="Badge Number" value={formData.badge_number} onChange={(v) => setFormData({...formData, badge_number: v})} placeholder="Badge #" icon={<Shield size={18}/>} />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 mt-4">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-500 ml-1">Issued Date</label>
+                            <input 
+                              type="date" 
+                              value={formData.issued_at}
+                              onChange={(e) => setFormData({...formData, issued_at: e.target.value})}
+                              className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all font-medium"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-slate-500 ml-1">Expiry Date</label>
+                            <input 
+                              type="date" 
+                              value={formData.expires_at}
+                              onChange={(e) => setFormData({...formData, expires_at: e.target.value})}
+                              className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all font-medium"
+                            />
+                          </div>
                         </div>
                       </div>
 
@@ -1195,8 +1259,11 @@ export default function App() {
                             <img src={formData.photo_url} className="w-full h-full object-cover" alt="Preview" />
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-2">
-                              <Camera size={32} />
-                              <span className="text-[10px] font-medium">Upload Photo</span>
+                              <div className="flex gap-4">
+                                <Plus size={32} />
+                                <Camera size={32} />
+                              </div>
+                              <span className="text-[10px] font-medium">Upload or Take Photo / አፕሎድ ወይም ፎቶ</span>
                             </div>
                           )}
                           <input 
@@ -1209,14 +1276,49 @@ export default function App() {
                       </div>
 
                       <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
-                        <p className="text-xs font-bold text-slate-500 mb-3">Commissioner Signature</p>
+                        <p className="text-xs font-bold text-slate-500 mb-3">Member Signature / የአባሉ ፊርማ</p>
+                        <div className="w-full h-24 bg-white rounded-2xl shadow-sm overflow-hidden border-2 border-white relative group flex items-center justify-center">
+                          {formData.member_signature ? (
+                            <img src={formData.member_signature} className="h-full object-contain" alt="Member Signature Preview" />
+                          ) : (
+                            <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
+                              <div className="flex gap-4">
+                                <Plus size={24} />
+                                <Camera size={24} />
+                              </div>
+                              <span className="text-[10px] font-medium">Upload or Take Photo / አፕሎድ ወይም ፎቶ</span>
+                            </div>
+                          )}
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="absolute inset-0 opacity-0 cursor-pointer" 
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const reader = new FileReader();
+                              reader.onloadend = async () => {
+                                const base64 = await resizeImage(reader.result as string, 400, 200);
+                                setFormData({ ...formData, member_signature: base64 });
+                              };
+                              reader.readAsDataURL(file);
+                            }}
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-center justify-center p-6 bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                        <p className="text-xs font-bold text-slate-500 mb-3">Commissioner Signature / የኮሚሽነሩ ፊርማ</p>
                         <div className="w-full h-24 bg-white rounded-2xl shadow-sm overflow-hidden border-2 border-white relative group flex items-center justify-center">
                           {formData.commissioner_signature ? (
                             <img src={formData.commissioner_signature} className="h-full object-contain" alt="Signature Preview" />
                           ) : (
-                            <div className="flex flex-col items-center justify-center text-slate-400 gap-1">
-                              <Plus size={24} />
-                              <span className="text-[10px] font-medium">Upload Signature</span>
+                            <div className="flex flex-col items-center justify-center text-slate-400 gap-2">
+                              <div className="flex gap-4">
+                                <Plus size={24} />
+                                <Camera size={24} />
+                              </div>
+                              <span className="text-[10px] font-medium">Upload or Take Photo / አፕሎድ ወይም ፎቶ</span>
                             </div>
                           )}
                           <input 
@@ -1352,7 +1454,10 @@ export default function App() {
                         blood_type: '', badge_number: '',
                         gender: '', complexion: '', height: '',
                         emergency_contact_name: '', emergency_contact_phone: '',
-                        commissioner_signature: ''
+                        commissioner_signature: '',
+                        member_signature: '',
+                        issued_at: new Date().toISOString().split('T')[0],
+                        expires_at: new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
                       });
                       setView('create');
                     }}
@@ -1399,7 +1504,7 @@ export default function App() {
                         <td className="px-6 py-4 text-sm text-slate-600">{record.phone}</td>
                         <td className="px-6 py-4 text-right">
                           <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {user?.role === 'Administrator' && (
+                            {user?.role !== 'Viewer' && (
                               <button 
                                 onClick={() => {
                                   setFormData({
@@ -1419,7 +1524,10 @@ export default function App() {
                                     height: record.height,
                                     emergency_contact_name: record.emergency_contact_name,
                                     emergency_contact_phone: record.emergency_contact_phone,
-                                    commissioner_signature: record.commissioner_signature
+                                    commissioner_signature: record.commissioner_signature,
+                                    member_signature: record.member_signature || '',
+                                    issued_at: record.issued_at || new Date().toISOString().split('T')[0],
+                                    expires_at: record.expires_at || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
                                   });
                                   setView('create');
                                 }}
@@ -1445,16 +1553,18 @@ export default function App() {
                             >
                               <Eye size={18} />
                             </button>
-                            <button 
-                              onClick={() => {
-                                setSelectedRecord(record);
-                                handlePrintSide('both');
-                              }}
-                              className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
-                              title="Print ID"
-                            >
-                              <Printer size={18} />
-                            </button>
+                            {user?.role === 'Administrator' && (
+                              <button 
+                                onClick={() => {
+                                  setSelectedRecord(record);
+                                  handlePrintSide('both');
+                                }}
+                                className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                                title="Print ID"
+                              >
+                                <Printer size={18} />
+                              </button>
+                            )}
                             {user?.role === 'Administrator' && (
                               <button 
                                 onClick={() => handleDeleteRecord(record.id)}
@@ -1506,7 +1616,10 @@ export default function App() {
                   height: selectedRecord.height,
                   emergency_contact_name: selectedRecord.emergency_contact_name,
                   emergency_contact_phone: selectedRecord.emergency_contact_phone,
-                  commissioner_signature: selectedRecord.commissioner_signature
+                  commissioner_signature: selectedRecord.commissioner_signature,
+                  member_signature: selectedRecord.member_signature || '',
+                  issued_at: selectedRecord.issued_at || new Date().toISOString().split('T')[0],
+                  expires_at: selectedRecord.expires_at || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0]
                 });
                 setShowPreview(false);
                 setView('create');
@@ -1701,22 +1814,24 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
             <div className={`space-y-6 flex flex-col items-center w-full lg:w-auto ${activeTab === 'back' || activeTab === 'combined' ? 'hidden lg:flex opacity-0 pointer-events-none absolute' : 'flex'}`}>
               <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Front Side / የፊት ገፅ</span>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => onPrint('front')}
-                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                    title="Print Front Only"
-                  >
-                    <Printer size={14} />
-                  </button>
-                  <button 
-                    onClick={() => onDownload('front')}
-                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                    title="Download Front Only"
-                  >
-                    <Download size={14} />
-                  </button>
-                </div>
+                {userRole === 'Administrator' && (
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => onPrint('front')}
+                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                      title="Print Front Only"
+                    >
+                      <Printer size={14} />
+                    </button>
+                    <button 
+                      onClick={() => onDownload('front')}
+                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                      title="Download Front Only"
+                    >
+                      <Download size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
               <div id={`card-front-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
                 <IDCardFront data={record} assets={assets} />
@@ -1727,22 +1842,24 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
             <div className={`space-y-6 flex flex-col items-center w-full lg:w-auto ${activeTab === 'front' || activeTab === 'combined' ? 'hidden lg:flex opacity-0 pointer-events-none absolute' : 'flex'}`}>
               <div className="flex items-center justify-between w-full px-2 max-w-[85.6mm]">
                 <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Back Side / የጀርባ ገፅ</span>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => onPrint('back')}
-                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                    title="Print Back Only"
-                  >
-                    <Printer size={14} />
-                  </button>
-                  <button 
-                    onClick={() => onDownload('back')}
-                    className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
-                    title="Download Back Only"
-                  >
-                    <Download size={14} />
-                  </button>
-                </div>
+                {userRole === 'Administrator' && (
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => onPrint('back')}
+                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                      title="Print Back Only"
+                    >
+                      <Printer size={14} />
+                    </button>
+                    <button 
+                      onClick={() => onDownload('back')}
+                      className="p-2 bg-white text-slate-600 rounded-lg shadow-sm hover:bg-slate-50 transition-all"
+                      title="Download Back Only"
+                    >
+                      <Download size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
               <div id={`card-back-${record.id_number}`} className="scale-[1.1] sm:scale-125 lg:scale-150 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.25)] rounded-[3.18mm]">
                 <IDCardBack data={record} assets={assets} />
@@ -1784,27 +1901,31 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
             </button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-            <button 
-              onClick={() => onDownload('both')}
-              className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl"
-            >
-              <Download size={24} />
-              Download Full (Front & Back)
-            </button>
-            <button 
-              onClick={() => onPrint('combined')}
-              className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-2xl shadow-[#0596694d] hover:bg-emerald-700 transition-all flex items-center justify-center gap-3"
-            >
-              <Printer size={24} />
-              Print Combined
-            </button>
-            <button 
-              onClick={() => onPrint('both')}
-              className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-2xl shadow-[#2563eb4d] hover:bg-blue-700 transition-all flex items-center justify-center gap-3"
-            >
-              <Printer size={24} />
-              Print Both Sides Together
-            </button>
+            {userRole === 'Administrator' && (
+              <>
+                <button 
+                  onClick={() => onDownload('both')}
+                  className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-xl"
+                >
+                  <Download size={24} />
+                  Download Full (Front & Back)
+                </button>
+                <button 
+                  onClick={() => onPrint('combined')}
+                  className="px-8 py-4 bg-emerald-600 text-white rounded-2xl font-bold shadow-2xl shadow-[#0596694d] hover:bg-emerald-700 transition-all flex items-center justify-center gap-3"
+                >
+                  <Printer size={24} />
+                  Print Combined
+                </button>
+                <button 
+                  onClick={() => onPrint('both')}
+                  className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-2xl shadow-[#2563eb4d] hover:bg-blue-700 transition-all flex items-center justify-center gap-3"
+                >
+                  <Printer size={24} />
+                  Print Both Sides Together
+                </button>
+              </>
+            )}
           </div>
         </div>
       </motion.div>
@@ -2233,6 +2354,11 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
             <X size={16} />
             Revoked ID / የተሰረዘ መታወቂያ
           </div>
+        ) : (new Date(record.expires_at) < new Date()) ? (
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-500 rounded-full text-sm font-bold mb-4 border border-amber-500/30">
+            <ShieldAlert size={16} />
+            Expired ID / ጊዜው ያለፈበት መታወቂያ
+          </div>
         ) : (
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#10b98133] text-emerald-400 rounded-full text-sm font-bold mb-4">
             <Check size={16} />
@@ -2244,13 +2370,22 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
       </div>
 
       <div className="flex flex-col items-center gap-12">
-        <div className="flex flex-col items-center gap-4">
-          <div className="scale-110 sm:scale-150 lg:scale-[2.0] origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm]">
-            <IDCardFront data={record} assets={assets} />
+        <div 
+          className="flex flex-col items-center gap-4 cursor-pointer"
+          onClick={() => setFlipped(!flipped)}
+        >
+          <div className="scale-[0.8] sm:scale-110 lg:scale-[1.5] origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm] transition-all duration-700 preserve-3d" style={{ transform: `rotateY(${flipped ? 180 : 0}deg) ${flipped ? 'scaleX(-1)' : ''}` }}>
+             <div className="relative">
+               {flipped ? (
+                 <IDCardBack data={record} assets={assets} />
+               ) : (
+                 <IDCardFront data={record} assets={assets} />
+               )}
+             </div>
           </div>
-          <div className="mt-32 scale-110 sm:scale-150 lg:scale-[2.0] origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm]">
-            <IDCardBack data={record} assets={assets} />
-          </div>
+          <p className="text-blue-500 text-xs font-bold animate-pulse mt-4">
+            {flipped ? "Click to view front / ፊቱን ለማየት ይጫኑ" : "Click to view back / ጀርባውን ለማየት ይጫኑ"}
+          </p>
         </div>
       </div>
 
