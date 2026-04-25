@@ -27,7 +27,11 @@ service cloud.firestore {
     }
 
     function getUserData() {
-      return hasProfile() ? get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data : {};
+      return hasProfile() ? get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data : {
+        "role": isGlobalAdmin() ? "Administrator" : "Viewer",
+        "active": true,
+        "email": request.auth.token.email
+      };
     }
  
     function isActive() {
@@ -74,8 +78,7 @@ service cloud.firestore {
  
     match /ids/{id} {
       allow get: if true;
-      allow list: if isGlobalAdmin() || (isActive() && (
-        isAdmin() || 
+      allow list: if isAdmin() || (isActive() && (
         (resource.data.get('created_by_email', '') == getUserData().get('email', '')) ||
         (resource.data.get('status', '') == 'approved')
       ));
