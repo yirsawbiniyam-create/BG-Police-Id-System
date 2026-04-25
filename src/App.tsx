@@ -310,24 +310,24 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
         </div>
 
         {/* Bottom: QR and Signatures */}
-        <div className="h-[22mm] flex items-end justify-between gap-2 mt-auto">
+        <div className="h-[22mm] flex items-center justify-between gap-1 mt-auto">
           {/* QR Code */}
-          <div className="flex flex-col items-center gap-0.5">
-            <div className="p-1 bg-white border rounded-md shadow-sm" style={{ borderColor: '#cbd5e1' }}>
+          <div className="flex flex-col items-center justify-center h-full min-w-[20mm]">
+            <div className="p-1 bg-white border rounded shadow-sm flex items-center justify-center" style={{ borderColor: '#cbd5e1' }}>
               <QRCodeSVG 
                 value={`${isMounted ? window.location.origin : ''}/verify/${data.id_number}`} 
-                size={72} 
+                size={68} 
                 level="M"
               />
             </div>
-            <span className="text-[5px] font-black tracking-tighter" style={{ color: '#000000' }}>{data.id_number}</span>
+            <span className="text-[5px] font-black tracking-tighter mt-0.5" style={{ color: '#000000' }}>{data.id_number}</span>
           </div>
 
           {/* Signatures Container - Side by Side */}
-          <div className="flex flex-1 items-end justify-around pb-1">
+          <div className="flex flex-1 items-end justify-around h-full pb-1">
             {/* Member Signature */}
-            <div className="flex flex-col items-center w-[26mm]">
-              <div className="h-10 w-full flex items-center justify-center relative border-b border-black/30">
+            <div className="flex flex-col items-center w-[25mm]">
+              <div className="h-9 w-full flex items-center justify-center relative border-b border-black/30">
                 {data.member_signature ? (
                   <img 
                     src={data.member_signature} 
@@ -340,13 +340,13 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
                 )}
               </div>
               <div className="text-[4px] font-black uppercase text-center leading-none mt-1" style={{ color: '#000000' }}>
-                Member's Signature<br/>የአባሉ ፊርማ
+                Member's Signature / የአባሉ ፊርማ
               </div>
             </div>
 
             {/* Commissioner Signature */}
-            <div className="flex flex-col items-center w-[26mm]">
-              <div className="h-10 w-full flex items-center justify-center relative border-b border-black/30">
+            <div className="flex flex-col items-center w-[25mm]">
+              <div className="h-9 w-full flex items-center justify-center relative border-b border-black/30">
                 {data.commissioner_signature ? (
                   <img 
                     src={data.commissioner_signature} 
@@ -359,7 +359,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
                 )}
               </div>
               <div className="text-[4px] font-black uppercase text-center leading-none mt-1" style={{ color: '#000000' }}>
-                Commissioner Signature<br/>የኮሚሽነሩ ፊርማ
+                Commissioner Signature / የኮሚሽነሩ ፊርማ
               </div>
             </div>
           </div>
@@ -641,13 +641,16 @@ export default function App() {
             const userCredential = await signInAnonymously(auth);
             const uid = userCredential.user.uid;
             
-            // Tag user doc with UID for rules
-            await updateDoc(userDoc.ref, { 
-              uid: uid,
+            // Create/Update a session profile that the Security Rules can trust
+            // We use the UID as the document ID so rules can find it easily
+            await setDoc(doc(db, 'profiles', uid), {
+              email: userData.email,
+              role: userData.role,
+              active: userData.active !== false,
               last_login: new Date().toISOString()
             });
           } catch (anonErr) {
-            console.warn("Anonymous sign-in mapping failed:", anonErr);
+            console.warn("Session profile creation failed:", anonErr);
           }
           
           const sessionUser = {
