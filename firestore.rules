@@ -15,25 +15,40 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    function isGlobalAdmin() {
+      return isSignedIn() && (
+        (request.auth.token.get('email', '').lower() == "yirsawbiniyam@gmail.com") ||
+        (request.auth.token.get('email', '').lower() == "policeregion551@gmail.com") ||
+        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+         (get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.get('email', '').lower() == "policeregion551@gmail.com" ||
+          get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.get('email', '').lower() == "yirsawbiniyam@gmail.com"))
+      );
+    }
+
     function getUserData() {
-      // Profiles indexed by UID provide a secure lookup for roles and active status
       return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
     }
  
     function isActive() {
-      return isSignedIn() && (getUserData().active == true);
+      return isGlobalAdmin() || (
+        isSignedIn() && 
+        exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) &&
+        getUserData().get('active', false) == true
+      );
     }
  
     function isAdmin() {
-      return isActive() && (
-        getUserData().role == 'Administrator' || 
-        request.auth.token.email == "yirsawbiniyam@gmail.com" ||
-        request.auth.token.email == "policeregion551@gmail.com"
+      return isGlobalAdmin() || (
+        isActive() && 
+        getUserData().get('role', '') == 'Administrator'
       );
     }
  
     function isDataEntry() {
-      return isActive() && (getUserData().role == 'Data Entry' || isAdmin());
+      return isAdmin() || (
+        isActive() && 
+        getUserData().get('role', '') == 'Data Entry'
+      );
     }
  
     function isValidId(id) {
@@ -47,11 +62,10 @@ service cloud.firestore {
     // Domain Validation Blueprints
     // ===============================================================
     function isValidIDRecord(data) {
-      return data.id_number is string && data.id_number.size() > 0 && data.id_number.size() <= 50 &&
-             data.full_name_am is string && data.full_name_am.size() > 0 && data.full_name_am.size() <= 200 &&
-             data.full_name_en is string && data.full_name_en.size() > 0 && data.full_name_en.size() <= 200 &&
+      return data.id_number is string && data.id_number.size() > 0 &&
+             data.full_name_am is string && data.full_name_am.size() > 0 &&
              data.status in ['pending', 'approved', 'rejected'] &&
-             data.created_by_email is string && data.created_by_email.size() <= 100;
+             data.created_by_email is string;
     }
  
     // ===============================================================
@@ -59,48 +73,35 @@ service cloud.firestore {
     // ===============================================================
  
     match /ids/{id} {
-      // Public verification by ID number (get only, no listing)
       allow get: if true;
-      
-      // List records: Admin sees all, Data Entry sees what they created, Viewers see approved
-      allow list: if isActive() && (
+      allow list: if isGlobalAdmin() || (isActive() && (
         isAdmin() || 
-        (isDataEntry() && existing().created_by_email == getUserData().email) ||
-        (existing().status == 'approved')
-      );
+        (resource.data.get('created_by_email', '') == getUserData().get('email', '')) ||
+        (resource.data.get('status', '') == 'approved')
+      ));
  
       allow create: if isDataEntry() && isValidIDRecord(incoming()) && (
-        // Enforcement: Pending status unless admin
-        (isAdmin() || incoming().status == 'pending') &&
-        // Enforcement: identity integrity
-        incoming().created_by_email == getUserData().email
+        isAdmin() || (incoming().get('status', '') == 'pending' && incoming().get('created_by_email', '') == getUserData().get('email', ''))
       );
  
       allow update: if isActive() && (
-        // Admin can update anything
-        (isAdmin() && isValidIDRecord(incoming())) ||
-        // Data Entry can update their own PENDING records (e.g. fixing typos)
-        (isDataEntry() && existing().created_by_email == getUserData().email && existing().status == 'pending' && 
-         isValidIDRecord(incoming()) && incoming().status == 'pending' &&
-         incoming().diff(existing()).affectedKeys().hasOnly(['full_name_am', 'full_name_en', 'photo_url', 'phone', 'rank_am', 'rank_en', 'responsibility_am', 'responsibility_en', 'gender', 'blood_type', 'complexion', 'height', 'emergency_contact_name', 'emergency_contact_phone', 'member_signature', 'commissioner_signature', 'updated_at']))
+        isAdmin() || 
+        (isDataEntry() && existing().get('created_by_email', '') == getUserData().get('email', '') && existing().get('status', '') == 'pending' && 
+         incoming().get('status', '') == 'pending' && incoming().get('created_by_email', '') == existing().get('created_by_email', ''))
       );
  
       allow delete: if isAdmin();
     }
  
     match /users/{userId} {
-      // Admin only management
-      allow read, write: if isAdmin();
-      // Allow initial login check
-      allow list: if true;
+      allow read, write: if isGlobalAdmin() || isAdmin();
+      allow list: if true; 
     }
 
     match /profiles/{uid} {
-      // Mapping used for rules lookup
-      allow get: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow create: if isSignedIn() && request.auth.uid == uid && 
-                      get(/databases/$(database)/documents/users/$(incoming().email)).data.role == incoming().role;
-      allow update: if isAdmin();
+      allow get: if isSignedIn() && (request.auth.uid == uid || isAdmin() || isGlobalAdmin());
+      allow create: if isSignedIn() && request.auth.uid == uid;
+      allow update: if isAdmin() || isGlobalAdmin();
     }
 
     match /scans/{scanId} {
