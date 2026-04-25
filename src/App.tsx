@@ -486,13 +486,13 @@ export default function App() {
   useEffect(() => {
     setIsMounted(true);
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Check for Firestore-backed session first
+      // Check for Firestore-backed session first (Legacy / Migration)
       const savedSession = localStorage.getItem('police_id_session');
-      if (savedSession) {
+      if (savedSession && !firebaseUser) {
         try {
           const session = JSON.parse(savedSession);
           setUser({
-            id: firebaseUser?.uid || 'custom-session',
+            id: 'custom-session',
             email: session.email,
             role: session.role
           });
@@ -506,26 +506,67 @@ export default function App() {
 
       if (firebaseUser) {
         try {
-          // Fetch role from Firestore
-          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-          let role = 'Viewer';
-          if (userDoc.exists()) {
-            role = userDoc.data().role;
-          } else if (firebaseUser.email === 'policeregion551@gmail.com') {
-            role = 'Administrator';
+          // 1. Sync profile for Security Rules
+          let profileDoc = null;
+          try {
+            profileDoc = await getDoc(doc(db, 'profiles', firebaseUser.uid));
+          } catch (e) {
+            console.warn("Profile fetch restricted or failed:", e);
           }
+ 
+          const isAdminEmail = firebaseUser.email?.toLowerCase() === 'policeregion551@gmail.com' || 
+                               firebaseUser.email?.toLowerCase() === 'yirsawbiniyam@gmail.com';
           
+          let role = isAdminEmail ? 'Administrator' : 'Viewer';
+          let email = firebaseUser.email || 'Unknown';
+ 
+          if (!profileDoc?.exists()) {
+            // Find user in virtual 'users' collection or create default
+            let foundInUsers = false;
+            try {
+              const q = query(collection(db, 'users'), where('email', '==', firebaseUser.email));
+              const userSnapshot = await getDocs(q);
+              
+              if (!userSnapshot.empty) {
+                const userData = userSnapshot.docs[0].data();
+                role = userData.role;
+                email = userData.email;
+                foundInUsers = true;
+              }
+            } catch (e) {
+              console.warn("Users collection search skipped or failed", e);
+            }
+
+            // Always attempt to sync/create profile to satisfy Security Rules
+            try {
+              await setDoc(doc(db, 'profiles', firebaseUser.uid), {
+                email: email,
+                role: role,
+                active: true,
+                last_login: new Date().toISOString()
+              }, { merge: true });
+            } catch (e) {
+              console.error("Profile creation failed:", e);
+            }
+          } else {
+            const profileData = profileDoc.data();
+            role = profileData.role;
+            email = profileData.email;
+          }
+ 
           setUser({
             id: firebaseUser.uid,
-            email: firebaseUser.email || 'Unknown',
+            email: email,
             role: role as any
           });
         } catch (err) {
-          console.error("Auth state role fetch error:", err);
+          console.error("Auth state profile fetch/sync error:", err);
+          const isAdminEmail = firebaseUser.email?.toLowerCase() === 'policeregion551@gmail.com' || 
+                               firebaseUser.email?.toLowerCase() === 'yirsawbiniyam@gmail.com';
           setUser({
             id: firebaseUser.uid,
             email: firebaseUser.email || 'Unknown',
-            role: firebaseUser.email === 'policeregion551@gmail.com' ? 'Administrator' : 'Viewer'
+            role: isAdminEmail ? 'Administrator' : 'Viewer'
           });
         }
         setToken('firebase-token');
