@@ -16,17 +16,14 @@ service cloud.firestore {
     }
 
     function getUserData() {
-      // Use a collectionGroup or a specific path mapping for UIDs
-      // For this app, we store the UID in the user doc on login
-      // To keep it simple and performant, we check for a doc in 'users' where 'uid' matches
-      // Since rules don't support queries, we assume the document ID is the UID or we lookup a mapping
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      // Profiles indexed by UID provide a secure lookup for roles and active status
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
     }
-
+ 
     function isActive() {
-      return isSignedIn() && (getUserData().active != false);
+      return isSignedIn() && (getUserData().active == true);
     }
-
+ 
     function isAdmin() {
       return isActive() && (
         getUserData().role == 'Administrator' || 
@@ -34,18 +31,18 @@ service cloud.firestore {
         request.auth.token.email == "policeregion551@gmail.com"
       );
     }
-
+ 
     function isDataEntry() {
       return isActive() && (getUserData().role == 'Data Entry' || isAdmin());
     }
-
+ 
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
-
+ 
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
-
+ 
     // ===============================================================
     // Domain Validation Blueprints
     // ===============================================================
@@ -56,53 +53,54 @@ service cloud.firestore {
              data.status in ['pending', 'approved', 'rejected'] &&
              data.created_by_email is string && data.created_by_email.size() <= 100;
     }
-
+ 
     // ===============================================================
     // Collection Rules
     // ===============================================================
-
+ 
     match /ids/{id} {
       // Public verification by ID number (get only, no listing)
       allow get: if true;
       
-      // List records: Admin sees all, Data Entry sees what they created
-      allow list: if isActive() && (isAdmin() || (isDataEntry() && existing().created_by_email == getUserData().email));
-
+      // List records: Admin sees all, Data Entry sees what they created, Viewers see approved
+      allow list: if isActive() && (
+        isAdmin() || 
+        (isDataEntry() && existing().created_by_email == getUserData().email) ||
+        (existing().status == 'approved')
+      );
+ 
       allow create: if isDataEntry() && isValidIDRecord(incoming()) && (
-        // Enforcement: Penidng status unless admin
+        // Enforcement: Pending status unless admin
         (isAdmin() || incoming().status == 'pending') &&
         // Enforcement: identity integrity
         incoming().created_by_email == getUserData().email
       );
-
+ 
       allow update: if isActive() && (
-        // Admin can update anything to any valid status
+        // Admin can update anything
         (isAdmin() && isValidIDRecord(incoming())) ||
         // Data Entry can update their own PENDING records (e.g. fixing typos)
         (isDataEntry() && existing().created_by_email == getUserData().email && existing().status == 'pending' && 
          isValidIDRecord(incoming()) && incoming().status == 'pending' &&
-         incoming().diff(existing()).affectedKeys().hasOnly(['full_name_am', 'full_name_en', 'photo_url', 'phone', 'rank_am', 'rank_en', 'responsibility_am', 'responsibility_en', 'gender', 'blood_type', 'complexion', 'height', 'emergency_contact_name', 'emergency_contact_phone', 'member_signature', 'commissioner_signature']))
+         incoming().diff(existing()).affectedKeys().hasOnly(['full_name_am', 'full_name_en', 'photo_url', 'phone', 'rank_am', 'rank_en', 'responsibility_am', 'responsibility_en', 'gender', 'blood_type', 'complexion', 'height', 'emergency_contact_name', 'emergency_contact_phone', 'member_signature', 'commissioner_signature', 'updated_at']))
       );
-
+ 
       allow delete: if isAdmin();
     }
-
+ 
     match /users/{userId} {
-      // Allow the user to read their own profile or allow Admin to manage users
-      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || 
-                     // Initial lookup by email during handleLogin (might require listing with filter)
-                     (incoming() == null && request.query.limit <= 1)); 
-      
-      // Allow initial mapping of UID during login
-      allow update: if isSignedIn() && (
-        (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['uid', 'last_login'])) ||
-        isAdmin()
-      );
+      // Admin only management
+      allow read, write: if isAdmin();
+      // Allow initial login check
+      allow list: if true;
+    }
 
-      allow create, delete: if isAdmin();
-
-      // Special allowance for the initial login query (where email == '...')
-      allow list: if true; // Insecure for production, but needed for the custom login flow to find user by email
+    match /profiles/{uid} {
+      // Mapping used for rules lookup
+      allow get: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create: if isSignedIn() && request.auth.uid == uid && 
+                      get(/databases/$(database)/documents/users/$(incoming().email)).data.role == incoming().role;
+      allow update: if isAdmin();
     }
 
     match /scans/{scanId} {
