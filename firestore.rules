@@ -2,70 +2,116 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     // ===============================================================
-    // Helper Functions
+    // DEFAULT DENY
     // ===============================================================
-    function isAuthenticated() {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // ===============================================================
+    // Global Primitives
+    // ===============================================================
+    function isSignedIn() {
       return request.auth != null;
     }
 
+    function getUserData() {
+      // Use a collectionGroup or a specific path mapping for UIDs
+      // For this app, we store the UID in the user doc on login
+      // To keep it simple and performant, we check for a doc in 'users' where 'uid' matches
+      // Since rules don't support queries, we assume the document ID is the UID or we lookup a mapping
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isActive() {
+      return isSignedIn() && (getUserData().active != false);
+    }
+
     function isAdmin() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Administrator' ||
-          request.auth.token.email == "yirsawbiniyam@gmail.com" ||
-          request.auth.token.email == "policeregion551@gmail.com");
+      return isActive() && (
+        getUserData().role == 'Administrator' || 
+        request.auth.token.email == "yirsawbiniyam@gmail.com" ||
+        request.auth.token.email == "policeregion551@gmail.com"
+      );
     }
 
     function isDataEntry() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Data Entry' || isAdmin());
+      return isActive() && (getUserData().role == 'Data Entry' || isAdmin());
     }
 
-    function isViewer() {
-      return isAuthenticated() &&
-        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'Viewer' || isDataEntry());
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
 
-    function isValidEmail(email) {
-      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
-    }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
 
     // ===============================================================
-    // Domain Validators
+    // Domain Validation Blueprints
     // ===============================================================
     function isValidIDRecord(data) {
-      return data.id_number is string && data.id_number.size() > 0 &&
-             data.full_name_am is string && data.full_name_am.size() > 0 &&
-             data.full_name_en is string && data.full_name_en.size() > 0;
-    }
-
-    function isValidUser(data) {
-      return isValidEmail(data.email) &&
-             data.role in ['Administrator', 'Data Entry', 'Viewer'];
+      return data.id_number is string && data.id_number.size() > 0 && data.id_number.size() <= 50 &&
+             data.full_name_am is string && data.full_name_am.size() > 0 && data.full_name_am.size() <= 200 &&
+             data.full_name_en is string && data.full_name_en.size() > 0 && data.full_name_en.size() <= 200 &&
+             data.status in ['pending', 'approved', 'rejected'] &&
+             data.created_by_email is string && data.created_by_email.size() <= 100;
     }
 
     // ===============================================================
-    // Rules
+    // Collection Rules
     // ===============================================================
 
     match /ids/{id} {
-      allow read: if true; // Allow public verification
-      allow create, update: if isDataEntry() && isValidIDRecord(request.resource.data);
+      // Public verification by ID number (get only, no listing)
+      allow get: if true;
+      
+      // List records: Admin sees all, Data Entry sees what they created
+      allow list: if isActive() && (isAdmin() || (isDataEntry() && existing().created_by_email == getUserData().email));
+
+      allow create: if isDataEntry() && isValidIDRecord(incoming()) && (
+        // Enforcement: Penidng status unless admin
+        (isAdmin() || incoming().status == 'pending') &&
+        // Enforcement: identity integrity
+        incoming().created_by_email == getUserData().email
+      );
+
+      allow update: if isActive() && (
+        // Admin can update anything to any valid status
+        (isAdmin() && isValidIDRecord(incoming())) ||
+        // Data Entry can update their own PENDING records (e.g. fixing typos)
+        (isDataEntry() && existing().created_by_email == getUserData().email && existing().status == 'pending' && 
+         isValidIDRecord(incoming()) && incoming().status == 'pending' &&
+         incoming().diff(existing()).affectedKeys().hasOnly(['full_name_am', 'full_name_en', 'photo_url', 'phone', 'rank_am', 'rank_en', 'responsibility_am', 'responsibility_en', 'gender', 'blood_type', 'complexion', 'height', 'emergency_contact_name', 'emergency_contact_phone', 'member_signature', 'commissioner_signature']))
+      );
+
       allow delete: if isAdmin();
     }
 
     match /users/{userId} {
-      allow read: if true; // Allow login check (Insecure: consider Firebase Auth for production)
-      allow create, update: if isAdmin() && isValidUser(request.resource.data);
-      allow delete: if isAdmin();
+      // Allow the user to read their own profile or allow Admin to manage users
+      allow read: if isSignedIn() && (request.auth.uid == userId || isAdmin() || 
+                     // Initial lookup by email during handleLogin (might require listing with filter)
+                     (incoming() == null && request.query.limit <= 1)); 
+      
+      // Allow initial mapping of UID during login
+      allow update: if isSignedIn() && (
+        (request.auth.uid == userId && incoming().diff(existing()).affectedKeys().hasOnly(['uid', 'last_login'])) ||
+        isAdmin()
+      );
+
+      allow create, delete: if isAdmin();
+
+      // Special allowance for the initial login query (where email == '...')
+      allow list: if true; // Insecure for production, but needed for the custom login flow to find user by email
     }
 
     match /scans/{scanId} {
-      allow read: if isAuthenticated();
-      allow create: if true; // Allow public scan logging
+      allow read: if isDataEntry();
+      allow create: if true;
     }
 
     match /assets/{assetId} {
-      allow read: if true; // Allow public access to logos/flags
+      allow read: if true;
       allow write: if isAdmin();
     }
   }
