@@ -169,34 +169,34 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
         <div className="w-[56mm] flex flex-col justify-center py-0.5">
           <div className="space-y-0.5">
             <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm bg-black/5 border border-black/10">
-              <span className="text-[4px] font-bold uppercase text-slate-600">ID NO:</span>
+              <span className="text-[4px] font-bold uppercase text-slate-600">መለያ ቁጥር / ID NO:</span>
               <span className="text-[8px] font-black text-black tracking-wider">{data.id_number || "BGR-POL-1600000"}</span>
             </div>
             
             <div className="p-1 rounded-sm border-l-2 bg-white/40" style={{ borderLeftColor: '#1e3a8a' }}>
-              <div className="text-[4px] font-bold uppercase text-slate-500">FULL NAME / ሙሉ ስም</div>
+              <div className="text-[4px] font-bold uppercase text-slate-500">ሙሉ ስም / FULL NAME</div>
               <div className="text-[8px] font-bold leading-tight truncate text-black">{data.full_name_am}</div>
               <div className="text-[6.5px] font-semibold uppercase leading-tight truncate text-slate-700">{data.full_name_en}</div>
             </div>
 
             <div className="grid grid-cols-2 gap-1">
               <div>
-                <div className="text-[4px] font-bold uppercase text-slate-500">RANK / ማዕረግ</div>
+                <div className="text-[4px] font-bold uppercase text-slate-500">ማዕረግ / RANK</div>
                 <div className="text-[6.5px] font-bold truncate text-black">{data.rank_am} / <span className="text-[5.5px] font-medium uppercase">{data.rank_en}</span></div>
               </div>
               <div>
-                <div className="text-[4px] font-bold uppercase text-slate-500">RESPONSIBILITY / ሀላፊነት</div>
-                <div className="text-[6.5px] font-bold truncate text-black">{data.responsibility_am}</div>
+                <div className="text-[4px] font-bold uppercase text-slate-500">ኃላፊነት / RESPONSIBILITY</div>
+                <div className="text-[6.5px] font-bold truncate text-black">{data.responsibility_am} / <span className="text-[5.5px] font-medium uppercase">{data.responsibility_en}</span></div>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-1 mt-1 pt-1 border-t border-black/5">
               <div>
-                <div className="text-[4px] font-bold uppercase text-slate-500">Issued Date / የተሰጠበት ቀን</div>
+                <div className="text-[4px] font-bold uppercase text-slate-500">የተሰጠበት ቀን / Issued Date</div>
                 <div className="text-[6px] font-bold text-black">{data.issued_at || "N/A"}</div>
               </div>
               <div>
-                <div className="text-[4px] font-bold uppercase text-slate-500">Expiry Date / የሚያበቃበት ቀን</div>
+                <div className="text-[4px] font-bold uppercase text-slate-500">የሚያበቃበት ቀን / Expiry Date</div>
                 <div className="text-[6px] font-bold text-red-600">{data.expires_at || "N/A"}</div>
               </div>
             </div>
@@ -282,7 +282,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
           <div className="flex items-center justify-center gap-2.5">
             <div className="flex items-center gap-1">
               <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ፆታ / GENDER:</span>
-              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.gender || "N/A"}</span>
+              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.gender === 'M' ? 'ወ / M' : data.gender === 'F' ? 'ሴ / F' : (data.gender || "N/A")}</span>
             </div>
             <div className="flex items-center gap-1">
               <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ቁመት / HEIGHT:</span>
@@ -299,11 +299,11 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
               <span className="text-[7px] font-black" style={{ color: '#1d4ed8' }}>{data.phone || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ደም / BLOOD:</span>
+              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>የደም ዓይነት / BLOOD:</span>
               <span className="text-[7px] font-black" style={{ color: '#dc2626' }}>{data.blood_type || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ጡረታ / BADGE:</span>
+              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>የመለያ ቁጥር / BADGE:</span>
               <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.badge_number || "N/A"}</span>
             </div>
           </div>
@@ -340,7 +340,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
                 )}
               </div>
               <div className="text-[4px] font-black uppercase text-center leading-none mt-1" style={{ color: '#000000' }}>
-                Member's Signature / የአባሉ ፊርማ
+                የአባሉ ፊርማ / Member's Signature
               </div>
             </div>
 
@@ -359,7 +359,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
                 )}
               </div>
               <div className="text-[4px] font-black uppercase text-center leading-none mt-1" style={{ color: '#000000' }}>
-                Commissioner Signature / የኮሚሽነሩ ፊርማ
+                የኮሚሽነሩ ፊርማ / Commissioner Signature
               </div>
             </div>
           </div>
@@ -2430,21 +2430,21 @@ function UserManagement() {
               className="relative bg-white rounded-[40px] shadow-2xl w-full max-w-md overflow-hidden"
             >
               <div className="p-8 bg-blue-600 text-white flex justify-between items-center">
-                <h3 className="text-xl font-bold">Add New User</h3>
+                <h3 className="text-xl font-bold">አዲስ ተጠቃሚ ጨምር</h3>
                 <button onClick={() => setShowAdd(false)} className="p-2 hover:bg-white/20 rounded-full transition-all">
                   <X size={20} />
                 </button>
               </div>
               <form onSubmit={handleAddUser} className="p-8 space-y-6">
                 <FormInput 
-                  label="Email" 
+                  label="ኢሜይል" 
                   value={newUser.email} 
                   onChange={(v) => setNewUser({...newUser, email: v})} 
-                  placeholder="Email Address" 
+                  placeholder="የኢሜይል አድራሻ" 
                   icon={<User size={18} />} 
                 />
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 ml-1">Password</label>
+                  <label className="text-xs font-bold text-slate-500 ml-1">የይለፍ ቃል (Password)</label>
                   <div className="relative">
                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400">
                       <Shield size={18} />
@@ -2453,21 +2453,21 @@ function UserManagement() {
                       type="password" 
                       value={newUser.password}
                       onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                      placeholder="Password"
+                      placeholder="የይለፍ ቃል"
                       className="w-full pl-12 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all"
                     />
                   </div>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-500 ml-1">Role</label>
+                  <label className="text-xs font-bold text-slate-500 ml-1">ሚና (Role)</label>
                   <select 
                     value={newUser.role}
                     onChange={(e) => setNewUser({...newUser, role: e.target.value})}
                     className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-2xl text-sm focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all font-bold"
                   >
-                    <option value="Administrator">Administrator</option>
-                    <option value="Data Entry">Data Entry</option>
-                    <option value="Viewer">Viewer</option>
+                    <option value="Administrator">አስተዳዳሪ (Administrator)</option>
+                    <option value="Data Entry">መረጃ አስገቢ (Data Entry)</option>
+                    <option value="Viewer">ተመልካች (Viewer)</option>
                   </select>
                 </div>
                 <button 
@@ -2476,7 +2476,7 @@ function UserManagement() {
                   className="w-full py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {loading && <Loader2 className="animate-spin" size={18} />}
-                  Create User
+                  ተጠቃሚ ፍጠር
                 </button>
               </form>
             </motion.div>
