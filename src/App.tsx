@@ -1044,8 +1044,7 @@ export default function App() {
             }
           }
           const id_number = `BGR-POL-16${String(nextNum).padStart(5, '0')}`;
-
-          await addDoc(collection(db, 'ids'), {
+          const newRecordData = {
             ...finalData,
             id_number,
             photo_url,
@@ -1054,8 +1053,14 @@ export default function App() {
             status: user?.role === 'Administrator' ? 'approved' : 'pending',
             created_by_email: user?.email,
             created_at: new Date().toISOString()
-          });
+          };
+
+          const docRef = await addDoc(collection(db, 'ids'), newRecordData);
           alert("መታወቂያው በትክክል ተመዝግቧል! (ID registered successfully)");
+          
+          // Show preview immediately
+          setSelectedRecord({ id: docRef.id, ...newRecordData } as IDRecord);
+          setShowPreview(true);
         } catch (error) {
           handleFirestoreError(error, OperationType.CREATE, 'ids');
         }
@@ -1683,7 +1688,7 @@ export default function App() {
                                 </button>
                               </>
                             )}
-                            {((user?.role === 'Administrator') || (user?.role === 'Data Entry' && record.status === 'pending')) && (
+                            {((user?.role === 'Administrator') || (user?.role === 'Data Entry' && record.status !== 'approved')) && (
                               <button 
                                 onClick={() => {
                                   setFormData({
@@ -2082,6 +2087,12 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
             </button>
           </div>
           <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            {!canPrint && record.status === 'pending' && (
+              <div className="px-6 py-3 bg-amber-50 border border-amber-200 text-amber-700 rounded-2xl text-xs font-bold flex items-center gap-2">
+                <ShieldAlert size={16} />
+                ማሳሰቢያ፡ ይህ መታወቂያ በአስተዳዳሪ ሲጸድቅ ማተም ይችላሉ። (Pending Approval)
+              </div>
+            )}
             {canPrint && (
               <>
                 <button 
