@@ -1127,14 +1127,14 @@ export default function App() {
             commissioner_signature,
             member_signature,
             status: user?.role === 'Administrator' ? 'approved' : 'pending',
-            created_by_email: user?.email?.toLowerCase(),
+            created_by_email: (user?.email || 'anonymous').toLowerCase(),
             created_at: new Date().toISOString()
           };
 
           if (auth.currentUser) {
             await setDoc(doc(db, 'profiles', auth.currentUser.uid), {
-              email: user?.email?.toLowerCase(),
-              role: user?.role,
+              email: (user?.email || 'anonymous').toLowerCase(),
+              role: user?.role || 'Viewer',
               active: true,
               last_login: new Date().toISOString()
             }, { merge: true });
