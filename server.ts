@@ -24,21 +24,35 @@ async function startServer() {
       const apiKey = process.env.GEMINI_API_KEY;
       
       if (!apiKey) {
+        console.error("GEMINI_API_KEY is missing in environment variables");
         return res.status(500).json({ error: "Gemini API key not configured on server" });
       }
 
-      const genAI = new GoogleGenAI(apiKey as any);
-      // @ts-ignore
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const response = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+          }),
+        }
+      );
 
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-      
+      const data = await response.json() as any;
+
+      if (!response.ok) {
+        console.error("Gemini API External Error:", data);
+        return res.status(response.status).json(data);
+      }
+
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
       res.json({ text });
     } catch (error: any) {
       console.error("Gemini Proxy Error:", error);
-      res.status(500).json({ error: error.message || "Failed to generate content" });
+      res.status(500).json({ error: "Failed to generate content: " + error.message });
     }
   });
 
