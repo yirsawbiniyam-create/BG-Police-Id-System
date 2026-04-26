@@ -271,7 +271,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             <div className="flex-1 h-[0.3mm] bg-gradient-to-r from-red-600/40 to-transparent"></div>
           </div>
           <p className="text-[7.5px] font-black leading-tight text-justify" style={{ color: '#000000' }}>
-            ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡ ይህንን መታወቂያ የያዘ ግለሰብ የኮሚሽኑ የፖሊስ አባል በመሆኑ ሕግን የማስከበርና የማስገደድ ሙሉ ሥልጣን ተሰጥቶታል፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
+            ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡  መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
           </p>
           <p className="text-[6.5px] font-extrabold italic leading-tight text-justify" style={{ color: '#1e293b' }}>
             The Bearer of this ID card member of Police and is authorized to enforce the Law. He is obliged to this ID card.  If found, please return it to the nearest police station.
@@ -516,19 +516,25 @@ export default function App() {
   useEffect(() => {
     setIsMounted(true);
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      // Check for Firestore-backed session first (Legacy / Migration)
+      // 1. Check for local session first to prevent race conditions during custom login
       const savedSession = localStorage.getItem('police_id_session');
-      if (savedSession && !firebaseUser) {
+      let sessionData: any = null;
+      if (savedSession) {
         try {
-          const session = JSON.parse(savedSession);
-          setUser({
-            id: 'custom-session',
-            email: session.email,
-            role: session.role
-          });
-          setToken('firestore-session');
-          setIsAuthReady(true);
-          return;
+          sessionData = JSON.parse(savedSession);
+          // If we have a local session, prefer it initially to keep UI consistent
+          if (!firebaseUser || (firebaseUser.uid === sessionData.firebaseUid || firebaseUser.isAnonymous)) {
+            setUser({
+              id: sessionData.id,
+              email: sessionData.email,
+              role: sessionData.role
+            });
+            setToken('firestore-session');
+            if (!firebaseUser) {
+              setIsAuthReady(true);
+              return;
+            }
+          }
         } catch (e) {
           localStorage.removeItem('police_id_session');
         }
@@ -536,7 +542,7 @@ export default function App() {
 
       if (firebaseUser) {
         try {
-          // 1. Sync profile for Security Rules
+          // 2. Fetch profile from Firestore to get authoritative role
           let profileDoc = null;
           try {
             profileDoc = await getDoc(doc(db, 'profiles', firebaseUser.uid));
@@ -544,16 +550,15 @@ export default function App() {
             console.warn("Profile fetch restricted or failed:", e);
           }
  
-          const emailLower = firebaseUser.email?.toLowerCase() || '';
+          const emailLower = firebaseUser.email?.toLowerCase() || sessionData?.email?.toLowerCase() || '';
           const isAdminEmail = emailLower === 'policeregion551@gmail.com' || 
                                emailLower === 'yirsawbiniyam@gmail.com';
           
-          let role = isAdminEmail ? 'Administrator' : 'Viewer';
-          let email = firebaseUser.email || 'Unknown';
+          let role = isAdminEmail ? 'Administrator' : (sessionData?.role || 'Viewer');
+          let email = firebaseUser.email || sessionData?.email || 'Unknown';
  
           if (!profileDoc?.exists()) {
-            // Find user in virtual 'users' collection or create default
-            let foundInUsers = false;
+            // Profile doesn't exist yet, try to find in 'users' or use defaults
             try {
               const q = query(collection(db, 'users'), where('email', '==', email));
               const userSnapshot = await getDocs(q);
@@ -562,13 +567,12 @@ export default function App() {
                 const userData = userSnapshot.docs[0].data();
                 role = userData.role;
                 email = userData.email;
-                foundInUsers = true;
               }
             } catch (e) {
-              console.warn("Users collection search skipped or failed", e);
+              console.warn("Users lookup failed", e);
             }
 
-            // Always attempt to sync/create profile to satisfy Security Rules
+            // Sync profile to Firestore for Security Rules
             try {
               await setDoc(doc(db, 'profiles', firebaseUser.uid), {
                 email: email,
@@ -577,7 +581,7 @@ export default function App() {
                 last_login: new Date().toISOString()
               }, { merge: true });
             } catch (e) {
-              console.error("Profile creation failed:", e);
+              console.error("Auth state profile creation failed:", e);
             }
           } else {
             const profileData = profileDoc.data();
@@ -591,18 +595,10 @@ export default function App() {
             role: role as any
           });
         } catch (err) {
-          console.error("Auth state profile fetch/sync error:", err);
-          const emailLower = firebaseUser.email?.toLowerCase() || '';
-          const isAdminEmail = emailLower === 'policeregion551@gmail.com' || 
-                               emailLower === 'yirsawbiniyam@gmail.com';
-          setUser({
-            id: firebaseUser.uid,
-            email: firebaseUser.email || 'Unknown',
-            role: isAdminEmail ? 'Administrator' : 'Viewer'
-          });
+          console.error("Auth sync error:", err);
         }
         setToken('firebase-token');
-      } else {
+      } else if (!sessionData) {
         setUser(null);
         setToken(null);
       }
@@ -739,6 +735,7 @@ export default function App() {
 
             const sessionUser = {
               id: userDocId || 'superadmin-fallback',
+              firebaseUid: uid,
               email: email,
               role: userData.role || 'Viewer'
             };
