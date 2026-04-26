@@ -18,7 +18,11 @@ service cloud.firestore {
     function isSuperAdmin() {
       return isSignedIn() && (
         request.auth.token.get('email', '').lower() == 'policeregion551@gmail.com' ||
-        request.auth.token.get('email', '').lower() == 'yirsawbiniyam@gmail.com'
+        request.auth.token.get('email', '').lower() == 'yirsawbiniyam@gmail.com' ||
+        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.get('email', '').lower() == 'policeregion551@gmail.com') ||
+        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.get('email', '').lower() == 'yirsawbiniyam@gmail.com')
       );
     }
 
