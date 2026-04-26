@@ -15,89 +15,78 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isGlobalAdmin() {
+    function isSuperAdmin() {
       return isSignedIn() && (
-        request.auth.token.email.lower() == "policeregion551@gmail.com" || 
-        request.auth.token.email.lower() == "yirsawbiniyam@gmail.com"
+        request.auth.token.get('email', '').lower() == 'policeregion551@gmail.com' ||
+        request.auth.token.get('email', '').lower() == 'yirsawbiniyam@gmail.com'
       );
     }
 
-    function hasProfile() {
+    function hasValidProfile() {
       return isSignedIn() && exists(/databases/$(database)/documents/profiles/$(request.auth.uid));
     }
 
     function getUserData() {
-      return hasProfile() ? get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data : {
-        "role": isGlobalAdmin() ? "Administrator" : "Viewer",
-        "active": true,
-        "email": request.auth.token.email
-      };
+      return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
     }
- 
+
     function isActive() {
-      return isGlobalAdmin() || (
-        hasProfile() &&
+      return isSuperAdmin() || (
+        hasValidProfile() && 
         getUserData().get('active', false) == true
       );
     }
- 
+
     function isAdmin() {
-      return isGlobalAdmin() || (
+      return isSuperAdmin() || (
         isActive() && 
         getUserData().get('role', '') == 'Administrator'
       );
     }
- 
+
     function isDataEntry() {
       return isAdmin() || (
         isActive() && 
         getUserData().get('role', '') == 'Data Entry'
       );
     }
+
+    function currentUserEmail() {
+      return isSuperAdmin() ? request.auth.token.get('email', '') : (hasValidProfile() ? getUserData().get('email', '') : '');
+    }
  
     function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
  
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
  
     // ===============================================================
-    // Domain Validation Blueprints
-    // ===============================================================
-    function isValidIDRecord(data) {
-      return data.id_number is string && data.id_number.size() > 0 &&
-             data.full_name_am is string && data.full_name_am.size() > 0 &&
-             data.status in ['pending', 'approved', 'rejected'] &&
-             data.created_by_email is string;
-    }
- 
-    // ===============================================================
     // Collection Rules
     // ===============================================================
- 
+
     match /ids/{id} {
       allow get: if true;
-      allow list: if isAdmin() || (isActive() && (
-        (resource.data.get('created_by_email', '') == getUserData().get('email', '')) ||
-        (resource.data.get('status', '') == 'approved')
-      ));
+      allow list: if isAdmin() || 
+                    (isActive() && resource.data.get('created_by_email', '') == currentUserEmail()) || 
+                    (resource.data.get('status', '') == 'approved');
  
-      allow create: if isDataEntry() && isValidIDRecord(incoming()) && (
-        isAdmin() || (incoming().get('status', '') == 'pending' && incoming().get('created_by_email', '') == getUserData().get('email', ''))
+      allow create: if isActive() && isDataEntry() && (
+        isAdmin() || (incoming().get('status', '') == 'pending' && incoming().get('created_by_email', '') == currentUserEmail())
       );
  
       allow update: if isActive() && (
         isAdmin() || 
-        (isDataEntry() && existing().get('created_by_email', '') == getUserData().get('email', '') && existing().get('status', '') == 'pending' && 
+        (isDataEntry() && existing().get('created_by_email', '') == currentUserEmail() && existing().get('status', '') == 'pending' && 
          incoming().get('status', '') == 'pending' && incoming().get('created_by_email', '') == existing().get('created_by_email', ''))
       );
  
       allow delete: if isAdmin();
     }
- 
+
     match /users/{userId} {
-      allow read, write: if isGlobalAdmin() || isAdmin();
+      allow read, write: if isSuperAdmin() || isAdmin();
       allow list: if true; 
     }
 
