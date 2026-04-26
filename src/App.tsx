@@ -271,7 +271,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             <div className="flex-1 h-[0.3mm] bg-gradient-to-r from-red-600/40 to-transparent"></div>
           </div>
           <p className="text-[7.5px] font-black leading-tight text-justify" style={{ color: '#000000' }}>
-            ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡  መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
+            ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
           </p>
           <p className="text-[6.5px] font-extrabold italic leading-tight text-justify" style={{ color: '#1e293b' }}>
             The Bearer of this ID card member of Police and is authorized to enforce the Law. He is obliged to this ID card.  If found, please return it to the nearest police station.
@@ -1127,9 +1127,18 @@ export default function App() {
             commissioner_signature,
             member_signature,
             status: user?.role === 'Administrator' ? 'approved' : 'pending',
-            created_by_email: user?.email,
+            created_by_email: user?.email?.toLowerCase(),
             created_at: new Date().toISOString()
           };
+
+          if (auth.currentUser) {
+            await setDoc(doc(db, 'profiles', auth.currentUser.uid), {
+              email: user?.email?.toLowerCase(),
+              role: user?.role,
+              active: true,
+              last_login: new Date().toISOString()
+            }, { merge: true });
+          }
 
           const docRef = await addDoc(collection(db, 'ids'), newRecordData);
           alert("መታወቂያው በትክክል ተመዝግቧል! (ID registered successfully)");
