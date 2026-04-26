@@ -38,9 +38,13 @@ service cloud.firestore {
     }
 
     function isAdmin() {
+      // Check superadmin email in token (for regular login) OR in profile (for anonymous login)
       return isSuperAdmin() || (
-        isActive() && 
-        getUserData().get('role', '') == 'Administrator'
+        isActive() && (
+          getUserData().get('role', '') == 'Administrator' ||
+          getUserData().get('email', '').lower() == 'policeregion551@gmail.com' ||
+          getUserData().get('email', '').lower() == 'yirsawbiniyam@gmail.com'
+        )
       );
     }
 
@@ -52,34 +56,46 @@ service cloud.firestore {
     }
 
     function currentUserEmail() {
-      return isSuperAdmin() ? request.auth.token.get('email', '') : (hasValidProfile() ? getUserData().get('email', '') : '');
+      return isSuperAdmin() 
+        ? request.auth.token.get('email', '').lower() 
+        : (hasValidProfile() ? getUserData().get('email', '').lower() : '');
     }
- 
+
     function isValidId(id) {
       return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
- 
+
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
- 
+
     // ===============================================================
     // Collection Rules
     // ===============================================================
 
     match /ids/{id} {
       allow get: if true;
-      allow list: if isAdmin() || 
-                    (isActive() && resource.data.get('created_by_email', '') == currentUserEmail()) || 
-                    (resource.data.get('status', '') == 'approved');
- 
-      allow create: if isActive() && isDataEntry() && (
-        isAdmin() || (incoming().get('status', '') == 'pending' && incoming().get('created_by_email', '') == currentUserEmail())
+      allow list: if isAdmin() || (
+        isActive() && (
+          resource.data.get('status', '') == 'approved' ||
+          resource.data.get('created_by_email', '').lower() == currentUserEmail()
+        )
       );
- 
+
+      allow create: if isActive() && isDataEntry() && (
+        isAdmin() || (
+          incoming().get('status', '') == 'pending' && 
+          incoming().get('created_by_email', '').lower() == currentUserEmail()
+        )
+      );
+
       allow update: if isActive() && (
-        isAdmin() || 
-        (isDataEntry() && existing().get('created_by_email', '') == currentUserEmail() && existing().get('status', '') == 'pending' && 
-         incoming().get('status', '') == 'pending' && incoming().get('created_by_email', '') == existing().get('created_by_email', ''))
+        isAdmin() || (
+          isDataEntry() && 
+          existing().get('created_by_email', '').lower() == currentUserEmail() && 
+          existing().get('status', '') == 'pending' && 
+          incoming().get('status', '') == 'pending' && 
+          incoming().get('created_by_email', '').lower() == existing().get('created_by_email', '').lower()
+        )
       );
  
       allow delete: if isAdmin();
