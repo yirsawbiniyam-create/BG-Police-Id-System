@@ -271,10 +271,10 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             <div className="flex-1 h-[0.3mm] bg-gradient-to-r from-red-600/40 to-transparent"></div>
           </div>
           <p className="text-[7.5px] font-black leading-tight text-justify" style={{ color: '#000000' }}>
-            ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
+            ይህ የመታወቂያ ካርድ የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን ንብረት ነው፡፡ ይህንን መታወቂያ የያዘ ግለሰብ የኮሚሽኑ የፖሊስ አባል በመሆኑ ሕግን የማስከበርና የማስገደድ ሙሉ ሥልጣን ተሰጥቶታል፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
           </p>
           <p className="text-[6.5px] font-extrabold italic leading-tight text-justify" style={{ color: '#1e293b' }}>
-            The Bearer of this ID card member of Police and is authorized to enforce the Law. He is obliged to this ID card.  If found, please return it to the nearest police station.
+            This identity card is the property of the BGR Police Commission. The holder is a member of the police commission and is fully authorized to enforce the law. If found, please return it to the nearest police station.
           </p>
         </div>
 
@@ -316,9 +316,9 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
           <div className="flex flex-col items-center justify-center h-full min-w-[20mm]">
             <div className="p-1 bg-white border rounded shadow-sm flex items-center justify-center" style={{ borderColor: '#cbd5e1' }}>
               <QRCodeSVG 
-                value={`${isMounted ? window.location.origin : ''}/verify/${data.id_number}`} 
-                size={68} 
-                level="M"
+                value={`${window.location.protocol}//${window.location.host}/verify/${data.id_number}`} 
+                size={72} 
+                level="H"
               />
             </div>
             <span className="text-[5px] font-black tracking-tighter mt-0.5" style={{ color: '#000000' }}>{data.id_number}</span>
@@ -2525,7 +2525,7 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
     const fetchData = async () => {
       try {
         // Fetch record from Firestore
-        const q = query(collection(db, 'ids'), where('id_number', '==', idNumber), limit(1));
+        const q = query(collection(db, 'ids'), where('id_number', '==', idNumber.trim()), limit(1));
         const querySnapshot = await getDocs(q);
         if (!querySnapshot.empty) {
           const recordDoc = querySnapshot.docs[0];
@@ -2569,8 +2569,15 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
       <div className="w-20 h-20 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-6">
         <X size={40} />
       </div>
-      <h1 className="text-2xl font-bold text-slate-900">ልክ ያልሆነ መታወቂያ</h1>
-      <p className="text-slate-500 mt-2">ይህ መታወቂያ በመረጃ ቋታችን ውስጥ አልተገኘም።</p>
+      <h1 className="text-2xl font-bold text-slate-900">ልክ ያልሆነ መታወቂያ (Invalid ID)</h1>
+      <p className="text-slate-500 mt-2">ይህ መታወቂያ "{idNumber}" በመረጃ ቋታችን ውስጥ አልተገኘም ወይም አልጸደቀም።</p>
+      <p className="text-slate-400 text-xs mt-4">This ID Number was not found in our database or is not yet approved.</p>
+      <button 
+        onClick={() => window.location.href = '/'}
+        className="mt-8 px-6 py-2 bg-blue-600 text-white rounded-xl font-bold"
+      >
+        ወደ መግቢያ ተመለስ (Back to Login)
+      </button>
     </div>
   );
 
