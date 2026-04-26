@@ -271,10 +271,10 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             <div className="flex-1 h-[0.3mm] bg-gradient-to-r from-red-600/40 to-transparent"></div>
           </div>
           <p className="text-[7.5px] font-black leading-tight text-justify" style={{ color: '#000000' }}>
-            ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
+            ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡ ይህንን መታወቂያ የያዘ ግለሰብ የኮሚሽኑ የፖሊስ አባል በመሆኑ ሕግን የማስከበርና የማስገደድ ሙሉ ሥልጣን ተሰጥቶታል፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
           </p>
           <p className="text-[6.5px] font-extrabold italic leading-tight text-justify" style={{ color: '#1e293b' }}>
-            The Bearer of this ID card member of Police and is authorized to enforce the Law. He is obliged to this ID card. If found, please return it to the nearest police station.
+            The Bearer of this ID card member of Police and is authorized to enforce the Law. He is obliged to this ID card.  If found, please return it to the nearest police station.
           </p>
         </div>
 
@@ -698,10 +698,24 @@ export default function App() {
       const q = query(collection(db, 'users'), where('email', '==', email));
       const querySnapshot = await getDocs(q);
       
+      let userData: any = null;
+      let userDocId: string | null = null;
+
       if (!querySnapshot.empty) {
         const userDoc = querySnapshot.docs[0];
-        const userData = userDoc.data();
-        
+        userData = userDoc.data();
+        userDocId = userDoc.id;
+      } else if (email === 'policeregion551@gmail.com' && credentials.password === 'Po12345@') {
+        // Emergency Super-Admin fallback if not in Firestore yet
+        userData = {
+          email: email,
+          password: credentials.password,
+          role: 'Administrator',
+          active: true
+        };
+      }
+      
+      if (userData) {
         if (userData.active === false) {
           alert("Your account has been deactivated. Please contact the Administrator.");
           setLoading(false);
@@ -724,7 +738,7 @@ export default function App() {
             });
 
             const sessionUser = {
-              id: userDoc.id,
+              id: userDocId || 'superadmin-fallback',
               email: email,
               role: userData.role || 'Viewer'
             };
@@ -732,10 +746,15 @@ export default function App() {
             setUser(sessionUser as any);
             setToken('firestore-session');
             localStorage.setItem('police_id_session', JSON.stringify(sessionUser));
+            setLoading(false);
             return;
-          } catch (anonErr) {
+          } catch (anonErr: any) {
             console.error("Session profile creation failed:", anonErr);
-            alert("Login session initialization failed. Please try again.");
+            let errMsg = "Login session initialization failed.";
+            if (anonErr.code === 'auth/network-request-failed' || anonErr.message?.includes('network-request-failed')) {
+              errMsg += " Network error. This usually means the domain is not authorized in Firebase Console.";
+            }
+            alert(errMsg);
             setLoading(false);
             return;
           }
@@ -2530,9 +2549,15 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
         if (!querySnapshot.empty) {
           const recordDoc = querySnapshot.docs[0];
           const recordData = { ...recordDoc.data(), id: recordDoc.id } as IDRecord;
-          setRecord(recordData);
+          
+          // ONLY allow viewing if approved
+          if (recordData.status === 'approved') {
+            setRecord(recordData);
+          } else {
+            setRecord(null);
+          }
 
-          // Log scan
+          // Log scan (even if not approved, useful for security tracking)
           await addDoc(collection(db, 'scans'), {
             id_number: idNumber,
             timestamp: new Date().toISOString(),
@@ -2605,22 +2630,12 @@ function VerificationView({ idNumber, assets: initialAssets }: { idNumber: strin
       </div>
 
       <div className="flex flex-col items-center gap-12">
-        <div 
-          className="flex flex-col items-center gap-4 cursor-pointer"
-          onClick={() => setFlipped(!flipped)}
-        >
-          <div className="scale-[0.8] sm:scale-110 lg:scale-[1.5] origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm] transition-all duration-700 preserve-3d" style={{ transform: `rotateY(${flipped ? 180 : 0}deg) ${flipped ? 'scaleX(-1)' : ''}` }}>
+        <div className="flex flex-col items-center gap-4">
+          <div className="scale-[0.8] sm:scale-110 lg:scale-[1.5] origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm]">
              <div className="relative">
-               {flipped ? (
-                 <IDCardBack data={record} assets={assets} />
-               ) : (
-                 <IDCardFront data={record} assets={assets} />
-               )}
+               <IDCardFront data={record} assets={assets} />
              </div>
           </div>
-          <p className="text-blue-500 text-xs font-bold animate-pulse mt-4">
-            {flipped ? "Click to view front / ፊቱን ለማየት ይጫኑ" : "Click to view back / ጀርባውን ለማየት ይጫኑ"}
-          </p>
         </div>
       </div>
 
