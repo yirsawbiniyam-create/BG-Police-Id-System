@@ -77,48 +77,19 @@ service cloud.firestore {
     // ===============================================================
 
     match /ids/{id} {
-      allow get: if true;
-      allow list: if isAdmin() || (
-        isActive() && (
-          resource.data.get('status', '') == 'approved' ||
-          resource.data.get('created_by_email', '').lower() == currentUserEmail()
-        )
-      );
-
-      allow create: if isActive() && isDataEntry() && (
-        isAdmin() || (
-          incoming().get('status', '') == 'pending' && 
-          incoming().get('created_by_email', '').lower() == currentUserEmail()
-        )
-      );
-
-      allow update: if isActive() && (
-        isAdmin() || (
-          isDataEntry() && 
-          existing().get('created_by_email', '').lower() == currentUserEmail() && 
-          existing().get('status', '') == 'pending' && 
-          incoming().get('status', '') == 'pending' && 
-          incoming().get('created_by_email', '').lower() == existing().get('created_by_email', '').lower()
-        )
-      );
- 
-      allow delete: if isAdmin();
+      allow read, write: if true;
     }
 
     match /users/{userId} {
-      allow read, write: if isSuperAdmin() || isAdmin();
-      allow list: if true; 
+      allow read, write: if true;
     }
 
     match /profiles/{uid} {
-      allow get: if isSignedIn() && (request.auth.uid == uid || isAdmin());
-      allow create: if isSignedIn() && request.auth.uid == uid;
-      allow update: if (isSignedIn() && request.auth.uid == uid) || isAdmin();
+      allow read, write: if true;
     }
 
     match /scans/{scanId} {
-      allow read: if isDataEntry();
-      allow create: if true;
+      allow read, write: if true;
     }
 
     match /assets/{assetId} {
