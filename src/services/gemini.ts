@@ -1,49 +1,27 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
-let aiInstance: GoogleGenAI | null = null;
-
-function getAI() {
-  if (!aiInstance) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      console.warn("GEMINI_API_KEY is not set. Translation features will be disabled.");
-      return null;
-    }
-    aiInstance = new GoogleGenAI({ apiKey });
-  }
-  return aiInstance;
-}
-
 export async function translateText(text: string, targetLang: 'am' | 'en') {
   if (!text) return "";
-  
-  const ai = getAI();
-  if (!ai) return text;
   
   const prompt = targetLang === 'en' 
     ? `Translate the following Amharic text to English. Return ONLY the translated text: "${text}"`
     : `Translate the following English text to Amharic. Return ONLY the translated text: "${text}"`;
 
   try {
-    // Add a timeout to the translation call
-    const translationPromise = ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: prompt,
+    const response = await fetch("/api/gemini", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ prompt }),
     });
 
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error("Translation timed out")), 8000)
-    );
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-    const response = await Promise.race([translationPromise, timeoutPromise]) as any;
-    return response.text?.trim() || text;
+    const data = await response.json();
+    return data.text?.trim() || text;
   } catch (error: any) {
     console.error("Translation error:", error);
-    if (error.message?.includes("leaked") || error.message?.includes("403")) {
-      console.warn("Gemini API Key is invalid or leaked. Translation disabled.");
-      // Optionally disable the service for this session
-      aiInstance = null; 
-    }
     return text;
   }
 }
