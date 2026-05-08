@@ -141,10 +141,10 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
           crossOrigin="anonymous"
         />
         <div className="flex flex-col items-center -mt-1">
-          <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center bg-[#fbbf24] shadow-sm">
+          <div className="w-13 h-13 rounded-full overflow-hidden flex items-center justify-center bg-white shadow-md border-[2.5px] border-[#fbbf24]">
             <img 
               src={assets.police_logo || "https://picsum.photos/seed/logo/120/120"} 
-              className="w-full h-full object-contain mix-blend-multiply" 
+              className="w-full h-full object-contain p-0.5 filter contrast-125 brightness-110" 
               alt="Police Logo" 
               crossOrigin="anonymous"
             />
@@ -160,8 +160,8 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
 
       {/* Commission Name */}
       <div className="relative z-10 text-center mb-0.5 mt-0.5">
-        <h1 className="text-[7px] font-extrabold leading-none tracking-tight" style={{ color: '#000000' }}>የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
-        <h2 className="text-[5.5px] font-bold uppercase tracking-tighter leading-none mt-0.5" style={{ color: '#111827' }}>Benishangul-Gumuz Region Police Commission</h2>
+        <h1 className="text-[7.5px] font-black leading-none tracking-tight" style={{ color: '#000000' }}>የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
+        <h2 className="text-[6px] font-black uppercase tracking-tighter leading-none mt-0.5" style={{ color: '#000000' }}>Benishangul-Gumuz Region Police Commission</h2>
       </div>
 
       {/* Main Content Area */}
@@ -170,35 +170,35 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
         <div className="w-[56mm] flex flex-col justify-center py-0.5">
           <div className="space-y-0.5">
             <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm bg-black/5 border border-black/10">
-              <span className="text-[4px] font-bold uppercase text-slate-600">መለያ ቁጥር / ID NO:</span>
-              <span className="text-[8px] font-black text-black tracking-wider">{data.id_number || "BGR-POL-1600000"}</span>
+              <span className="text-[4.5px] font-bold uppercase text-slate-600">መለያ ቁጥር / ID NO:</span>
+              <span className="text-[8.5px] font-black text-black tracking-wider">{data.id_number || "BGR-POL-1600000"}</span>
             </div>
             
-            <div className="p-1 rounded-sm border-l-2 bg-white/40" style={{ borderLeftColor: '#1e3a8a' }}>
-              <div className="text-[4px] font-bold uppercase text-slate-500">ሙሉ ስም / FULL NAME</div>
-              <div className="text-[8px] font-bold leading-tight truncate text-black">{data.full_name_am}</div>
-              <div className="text-[6.5px] font-semibold uppercase leading-tight truncate text-slate-700">{data.full_name_en}</div>
+            <div className="p-1 rounded-sm border-l-2 bg-white/60" style={{ borderLeftColor: '#1e3a8a' }}>
+              <div className="text-[4.5px] font-black uppercase text-slate-700">ሙሉ ስም / FULL NAME</div>
+              <div className="text-[8.5px] font-black leading-tight truncate text-black">{data.full_name_am}</div>
+              <div className="text-[7px] font-black uppercase leading-tight truncate text-black">{data.full_name_en}</div>
             </div>
 
             <div className="grid grid-cols-2 gap-1">
               <div>
-                <div className="text-[4px] font-bold uppercase text-slate-500">ማዕረግ / RANK</div>
-                <div className="text-[6.5px] font-bold truncate text-black">{data.rank_am} / <span className="text-[5.5px] font-medium uppercase">{data.rank_en}</span></div>
+                <div className="text-[4.5px] font-black uppercase text-slate-700">ማዕረግ / RANK</div>
+                <div className="text-[7px] font-black truncate text-black">{data.rank_am} / <span className="text-[6px] font-black uppercase">{data.rank_en}</span></div>
               </div>
               <div>
-                <div className="text-[4px] font-bold uppercase text-slate-500">ኃላፊነት / RESPONSIBILITY</div>
-                <div className="text-[6.5px] font-bold truncate text-black">{data.responsibility_am} / <span className="text-[5.5px] font-medium uppercase">{data.responsibility_en}</span></div>
+                <div className="text-[4.5px] font-black uppercase text-slate-700">ኃላፊነት / RESPONSIBILITY</div>
+                <div className="text-[7px] font-black truncate text-black">{data.responsibility_am} / <span className="text-[6px] font-black uppercase">{data.responsibility_en}</span></div>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-1 mt-1 pt-1 border-t border-black/5">
+            <div className="grid grid-cols-2 gap-1 mt-1 pt-1 border-t border-black/10">
               <div>
-                <div className="text-[4px] font-bold uppercase text-slate-500">የተሰጠበት ቀን / Issued Date</div>
-                <div className="text-[6px] font-bold text-black">{data.issued_at || "N/A"}</div>
+                <div className="text-[5px] font-black uppercase text-slate-700">የተሰጠበት ቀን / Issued Date</div>
+                <div className="text-[6.5px] font-black text-black">{data.issued_at || "N/A"}</div>
               </div>
               <div>
-                <div className="text-[4px] font-bold uppercase text-slate-500">የሚያበቃበት ቀን / Expiry Date</div>
-                <div className="text-[6px] font-bold text-red-600">{data.expires_at || "N/A"}</div>
+                <div className="text-[5px] font-black uppercase text-slate-700">የሚያበቃበት ቀን / Expiry Date</div>
+                <div className="text-[6.5px] font-black text-red-600">{data.expires_at || "N/A"}</div>
               </div>
             </div>
           </div>
@@ -251,10 +251,10 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
       }}
     >
       {/* Watermark */}
-      <div className="absolute inset-0 flex items-center justify-center opacity-[0.08] pointer-events-none">
+      <div className="absolute inset-0 flex items-center justify-center opacity-[0.22] pointer-events-none">
         <img 
           src={assets.police_logo || "https://picsum.photos/seed/logo/200/200"} 
-          className="w-64 h-64 object-contain" 
+          className="w-44 h-44 object-contain filter contrast-150 brightness-110" 
           alt="Watermark" 
           crossOrigin="anonymous"
         />
@@ -282,30 +282,30 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
         <div className="py-1 flex flex-col gap-0.5 border-b" style={{ borderBottomColor: '#cbd5e1' }}>
           <div className="flex items-center justify-center gap-2.5">
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ፆታ / GENDER:</span>
-              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.gender === 'M' ? 'ወ / M' : data.gender === 'F' ? 'ሴ / F' : (data.gender || "N/A")}</span>
+              <span className="text-[4.5px] font-black uppercase" style={{ color: '#1e293b' }}>ፆታ / GENDER:</span>
+              <span className="text-[7.5px] font-black" style={{ color: '#000000' }}>{data.gender === 'M' ? 'ወ / M' : data.gender === 'F' ? 'ሴ / F' : (data.gender || "N/A")}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ቁመት / HEIGHT:</span>
-              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.height || "N/A"}</span>
+              <span className="text-[4.5px] font-black uppercase" style={{ color: '#1e293b' }}>ቁመት / HEIGHT:</span>
+              <span className="text-[7.5px] font-black" style={{ color: '#000000' }}>{data.height || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>መልክ / COMPLEXION:</span>
-              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.complexion || "N/A"}</span>
+              <span className="text-[4.5px] font-black uppercase" style={{ color: '#1e293b' }}>መልክ / COMPLEXION:</span>
+              <span className="text-[7.5px] font-black" style={{ color: '#000000' }}>{data.complexion || "N/A"}</span>
             </div>
           </div>
           <div className="flex items-center justify-center gap-2.5">
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>ስልክ / PHONE:</span>
-              <span className="text-[7px] font-black" style={{ color: '#1d4ed8' }}>{data.phone || "N/A"}</span>
+              <span className="text-[4.5px] font-black uppercase" style={{ color: '#1e293b' }}>ስልክ / PHONE:</span>
+              <span className="text-[7.5px] font-black" style={{ color: '#1d4ed8' }}>{data.phone || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>የደም ዓይነት / BLOOD:</span>
-              <span className="text-[7px] font-black" style={{ color: '#dc2626' }}>{data.blood_type || "N/A"}</span>
+              <span className="text-[4.5px] font-black uppercase" style={{ color: '#1e293b' }}>የደም ዓይነት / BLOOD:</span>
+              <span className="text-[7.5px] font-black" style={{ color: '#dc2626' }}>{data.blood_type || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4px] font-black uppercase" style={{ color: '#475569' }}>የመለያ ቁጥር / BADGE:</span>
-              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.badge_number || "N/A"}</span>
+              <span className="text-[4.5px] font-black uppercase" style={{ color: '#1e293b' }}>የመለያ ቁጥር / BADGE:</span>
+              <span className="text-[7.5px] font-black" style={{ color: '#000000' }}>{data.badge_number || "N/A"}</span>
             </div>
           </div>
         </div>
@@ -2156,7 +2156,7 @@ function PreviewModal({ record, assets, onClose, onPrint, onDownload, onEdit, us
                   className="px-12 py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-2xl shadow-[#2563eb4d] hover:bg-blue-700 transition-all flex items-center justify-center gap-3"
                 >
                   <Printer size={24} />
-                  ሁለቱንም ገጽ አትም
+                  ሁለቱንም ገጽ አትም (Both Sides Print)
                 </button>
               </>
             )}
