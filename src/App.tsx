@@ -379,6 +379,220 @@ function useCardMatchedLogo(logoSrc?: string) {
   return matched;
 }
 
+const matchedPhotoCache = new Map<string, string>();
+
+const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
+  if (!src) return Promise.resolve(src);
+  const cached = matchedPhotoCache.get(src);
+  if (cached) return Promise.resolve(cached);
+
+  return new Promise((resolve) => {
+    const img = new Image();
+    if (!src.startsWith('data:')) {
+      img.crossOrigin = 'anonymous';
+    }
+    img.onload = () => {
+      try {
+        const srcW = img.naturalWidth || img.width;
+        const srcH = img.naturalHeight || img.height;
+        if (!srcW || !srcH) {
+          resolve(src);
+          return;
+        }
+        // Normalize onto exact 19.5:24.5 portrait canvas (312x392) anchored at top so edges & feathering never clip
+        const w = 312;
+        const h = 392;
+        const targetRatio = w / h;
+        const srcRatio = srcW / srcH;
+        let sx = 0, sy = 0, sw = srcW, sh = srcH;
+        if (srcRatio > targetRatio) {
+          sw = Math.round(srcH * targetRatio);
+          sx = Math.max(0, Math.round((srcW - sw) / 2));
+        } else {
+          sh = Math.round(srcW / targetRatio);
+          sy = 0; // Keep head/top intact
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(src);
+          return;
+        }
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+        const imageData = ctx.getImageData(0, 0, w, h);
+        const data = imageData.data;
+
+        // Sample upper-left & upper-right studio backdrop corners
+        let sumR = 0, sumG = 0, sumB = 0, cnt = 0;
+        let minCornerR = 255, maxCornerR = 0, minCornerG = 255, maxCornerG = 0, minCornerB = 255, maxCornerB = 0;
+        const patchW = Math.min(8, Math.floor(w / 6));
+        const patchH = Math.min(8, Math.floor(h / 6));
+        for (let y = 0; y < patchH; y++) {
+          for (let x = 0; x < patchW; x++) {
+            for (const cx of [x, w - 1 - x]) {
+              const p = (y * w + cx) * 4;
+              if (data[p + 3] > 200) {
+                const r = data[p], g = data[p + 1], b = data[p + 2];
+                sumR += r; sumG += g; sumB += b; cnt++;
+                if (r < minCornerR) minCornerR = r; if (r > maxCornerR) maxCornerR = r;
+                if (g < minCornerG) minCornerG = g; if (g > maxCornerG) maxCornerG = g;
+                if (b < minCornerB) minCornerB = b; if (b > maxCornerB) maxCornerB = b;
+              }
+            }
+          }
+        }
+
+        const bgR = cnt > 0 ? sumR / cnt : 255;
+        const bgG = cnt > 0 ? sumG / cnt : 255;
+        const bgB = cnt > 0 ? sumB / cnt : 255;
+        const bgSpread = Math.max(maxCornerR - minCornerR, maxCornerG - minCornerG, maxCornerB - minCornerB);
+        const bgLum = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
+        const looksLikeSkin = (bgR - bgB > 28) && bgG < 200;
+        const hasUniformStudioBackdrop = cnt > 0 && bgSpread <= 42 && (bgLum >= 130 || (bgB > bgR + 14 && bgLum >= 95)) && !looksLikeSkin;
+
+        const visited = new Uint8Array(w * h);
+        const queue = new Int32Array(w * h);
+        let head = 0;
+        let tail = 0;
+
+        const isBackdropPixel = (idx: number) => {
+          const p = idx * 4;
+          const a = data[p + 3];
+          if (a < 25) return true;
+          const r = data[p], g = data[p + 1], b = data[p + 2];
+          const maxC = Math.max(r, g, b);
+          const minC = Math.min(r, g, b);
+          // Bright / white studio background
+          if (r >= 208 && g >= 208 && b >= 208 && (maxC - minC) <= 44) {
+            return true;
+          }
+          // Uniform studio backdrop (light blue, cyan, light gray, cream)
+          if (hasUniformStudioBackdrop) {
+            const dist = Math.hypot(r - bgR, g - bgG, b - bgB);
+            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
+            if (dist <= 40 && (lum >= 115 || bgB > bgR + 14)) {
+              return true;
+            }
+          }
+          return false;
+        };
+
+        const enqueueIfBackdrop = (x: number, y: number) => {
+          const idx = y * w + x;
+          if (!visited[idx] && isBackdropPixel(idx)) {
+            visited[idx] = 1;
+            queue[tail++] = idx;
+          }
+        };
+
+        for (let x = 0; x < w; x++) {
+          enqueueIfBackdrop(x, 0);
+        }
+        const sideLimitY = Math.round(h * 0.8);
+        for (let y = 1; y < sideLimitY; y++) {
+          enqueueIfBackdrop(0, y);
+          enqueueIfBackdrop(w - 1, y);
+        }
+
+        while (head < tail) {
+          const idx = queue[head++];
+          const p = idx * 4;
+          data[p + 3] = 0;
+          const x = idx % w;
+          const y = (idx - x) / w;
+          if (x > 0) enqueueIfBackdrop(x - 1, y);
+          if (x < w - 1) enqueueIfBackdrop(x + 1, y);
+          if (y > 0) enqueueIfBackdrop(x, y - 1);
+          if (y < h - 1) enqueueIfBackdrop(x, y + 1);
+        }
+
+        // Soften anti-aliased fringe adjacent to cleared studio background
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const idx = y * w + x;
+            if (visited[idx]) continue;
+            const clearedNeighbors =
+              (visited[idx - 1] ? 1 : 0) +
+              (visited[idx + 1] ? 1 : 0) +
+              (visited[idx - w] ? 1 : 0) +
+              (visited[idx + w] ? 1 : 0);
+            if (clearedNeighbors > 0) {
+              const p = idx * 4;
+              const factor = clearedNeighbors >= 2 ? 0.2 : 0.45;
+              data[p + 3] = Math.round(data[p + 3] * factor);
+            }
+          }
+        }
+
+        // Organic outer edge & bottom feathering so NO sharp rectangle border ever appears
+        const smooth = (t: number) => {
+          const c = Math.max(0, Math.min(1, t));
+          return c * c * (3 - 2 * c);
+        };
+        for (let y = 0; y < h; y++) {
+          const ny = y / h;
+          const topFade = ny < 0.04 ? smooth(ny / 0.04) : 1;
+          const bottomFade = ny > 0.85 ? smooth((1 - ny) / 0.15) : 1;
+          const yFade = topFade * bottomFade;
+          for (let x = 0; x < w; x++) {
+            const idx = y * w + x;
+            const p = idx * 4;
+            if (data[p + 3] === 0) continue;
+            const nx = x / w;
+            const leftFade = nx < 0.06 ? smooth(nx / 0.06) : 1;
+            const rightFade = nx > 0.94 ? smooth((1 - nx) / 0.06) : 1;
+            const edgeFade = yFade * leftFade * rightFade;
+            if (edgeFade < 1) {
+              data[p + 3] = Math.round(data[p + 3] * edgeFade);
+            }
+          }
+        }
+
+        ctx.putImageData(imageData, 0, 0);
+        const out = canvas.toDataURL('image/png');
+        matchedPhotoCache.set(src, out);
+        resolve(out);
+      } catch {
+        resolve(src);
+      }
+    };
+    img.onerror = () => resolve(src);
+    img.src = src;
+  });
+};
+
+function useCardMatchedPhoto(photoSrc?: string) {
+  const [matched, setMatched] = useState<string | undefined>(() =>
+    photoSrc ? (matchedPhotoCache.get(photoSrc) || photoSrc) : undefined
+  );
+
+  useEffect(() => {
+    let active = true;
+    if (!photoSrc) {
+      setMatched(undefined);
+      return;
+    }
+    const cached = matchedPhotoCache.get(photoSrc);
+    if (cached) {
+      setMatched(cached);
+      return;
+    }
+    setMatched(photoSrc);
+    stripPhotoBackgroundAndBlend(photoSrc).then((clean) => {
+      if (active) setMatched(clean);
+    });
+    return () => {
+      active = false;
+    };
+  }, [photoSrc]);
+
+  return matched;
+}
+
 // --- Components ---
 
 function CardOrnamentalFrame({ variant = 'front' }: { variant?: 'front' | 'back' }) {
@@ -464,6 +678,7 @@ function CardOrnamentalFrame({ variant = 'front' }: { variant?: 'front' | 'back'
 const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, assets: Assets }>(({ data, assets }, ref) => {
   const isApproved = data.status === 'approved' && !data.deleted;
   const matchedLogo = useCardMatchedLogo(assets.police_logo);
+  const matchedPhoto = useCardMatchedPhoto(data.photo_url);
 
   const rankCombined = `${data.rank_am || ''}${data.rank_en ? ` / ${data.rank_en}` : ''}`.trim();
   const rankLen = rankCombined.length;
@@ -652,19 +867,27 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
           </div>
         </div>
 
-        {/* Right Column: Photo */}
-        <div className="w-[20.5mm] flex flex-col items-center justify-center">
-          <div className="w-[18.5mm] h-[23mm] bg-white border rounded-sm overflow-hidden shadow-sm relative border-slate-300">
-            {data.photo_url ? (
+        {/* Right Column: Borderless Portrait Blended Softly Toward White into Card Background */}
+        <div className="w-[21mm] flex flex-col items-center justify-center">
+          <div
+            className="w-[20.5mm] h-[25.5mm] relative flex items-end justify-center"
+            style={{
+              background: 'radial-gradient(ellipse 68% 72% at 50% 48%, rgba(255, 255, 255, 0.88) 0%, rgba(255, 251, 235, 0.45) 52%, rgba(255, 255, 255, 0) 76%)'
+            }}
+          >
+            {matchedPhoto ? (
               <img 
-                src={data.photo_url} 
-                className="w-full h-full object-cover" 
+                src={matchedPhoto} 
+                className="w-[19.5mm] h-[24.5mm] object-contain relative z-10" 
                 alt="Member" 
                 crossOrigin="anonymous"
               />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-200">
-                <User size={30} />
+              <div
+                className="w-[16mm] h-[16mm] rounded-full flex items-center justify-center mb-3"
+                style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)', color: '#94a3b8' }}
+              >
+                <User size={26} />
               </div>
             )}
           </div>
