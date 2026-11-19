@@ -15,15 +15,12 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isSuperAdmin() {
-      return isSignedIn() && (
-        request.auth.token.get('email', '').lower() == 'policeregion551@gmail.com' ||
-        request.auth.token.get('email', '').lower() == 'yirsawbiniyam@gmail.com' ||
-        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.get('email', '').lower() == 'policeregion551@gmail.com') ||
-        (exists(/databases/$(database)/documents/profiles/$(request.auth.uid)) && 
-         get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data.get('email', '').lower() == 'yirsawbiniyam@gmail.com')
-      );
+    function isRealAuthSuperAdmin() {
+      return isSignedIn() &&
+        request.auth.token.firebase.sign_in_provider != 'anonymous' && (
+          request.auth.token.get('email', '').lower() == 'policeregion551@gmail.com' ||
+          request.auth.token.get('email', '').lower() == 'yirsawbiniyam@gmail.com'
+        );
     }
 
     function hasValidProfile() {
@@ -34,34 +31,52 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/profiles/$(request.auth.uid)).data;
     }
 
-    function isActive() {
-      return isSuperAdmin() || (
-        hasValidProfile() && 
-        getUserData().get('active', false) == true
-      );
-    }
-
-    function isAdmin() {
-      // Check superadmin email in token (for regular login) OR in profile (for anonymous login)
-      return isSuperAdmin() || (
-        isActive() && (
-          getUserData().get('role', '') == 'Administrator' ||
+    function isSuperAdmin() {
+      return isRealAuthSuperAdmin() || (
+        hasValidProfile() &&
+        getUserData().get('active', false) == true &&
+        getUserData().get('role', '') == 'Administrator' && (
           getUserData().get('email', '').lower() == 'policeregion551@gmail.com' ||
           getUserData().get('email', '').lower() == 'yirsawbiniyam@gmail.com'
         )
       );
     }
 
+    function isActive() {
+      return isSuperAdmin() || (
+        hasValidProfile() &&
+        getUserData().get('active', false) == true
+      );
+    }
+
+    function isAdmin() {
+      return isSuperAdmin() || (
+        isActive() &&
+        getUserData().get('role', '') == 'Administrator'
+      );
+    }
+
+    function isApprover() {
+      return isAdmin() || (
+        isActive() &&
+        getUserData().get('role', '') == 'Approver'
+      );
+    }
+
     function isDataEntry() {
       return isAdmin() || (
-        isActive() && 
+        isActive() &&
         getUserData().get('role', '') == 'Data Entry'
       );
     }
 
+    function isAuthorizedPrinter() {
+      return isAdmin() || isApprover() || isDataEntry();
+    }
+
     function currentUserEmail() {
-      return isSuperAdmin() 
-        ? request.auth.token.get('email', '').lower() 
+      return request.auth.token.get('email', '') != ''
+        ? request.auth.token.get('email', '').lower()
         : (hasValidProfile() ? getUserData().get('email', '').lower() : '');
     }
 
@@ -72,29 +87,180 @@ service cloud.firestore {
     function incoming() { return request.resource.data; }
     function existing() { return resource.data; }
 
+    function isValidProfileDoc(data) {
+      return data.keys().hasAll(['email', 'username', 'role', 'active', 'last_login']) &&
+        data.keys().hasOnly(['email', 'username', 'role', 'active', 'last_login', 'user_doc_id']) &&
+        data.email is string && data.email.size() <= 200 &&
+        data.username is string && data.username.size() > 0 && data.username.size() <= 120 &&
+        data.role in ['Administrator', 'Approver', 'Data Entry', 'Viewer'] &&
+        data.active is bool &&
+        data.last_login is string && data.last_login.size() <= 64 &&
+        (
+          isRealAuthSuperAdmin() ||
+          (
+            data.keys().hasAll(['user_doc_id']) &&
+            isValidId(data.user_doc_id) &&
+            exists(/databases/$(database)/documents/users/$(data.user_doc_id)) &&
+            get(/databases/$(database)/documents/users/$(data.user_doc_id)).data.get('active', true) == true &&
+            get(/databases/$(database)/documents/users/$(data.user_doc_id)).data.role == data.role
+          )
+        );
+    }
+
+    function isValidIdRecord(data) {
+      return data.keys().hasAll(['id_number', 'status']) &&
+        data.keys().hasOnly([
+          'id_number', 'full_name_am', 'full_name_en', 'rank_am', 'rank_en',
+          'responsibility_am', 'responsibility_en', 'phone', 'photo_url',
+          'blood_type', 'badge_number', 'fayda_number', 'gender', 'complexion',
+          'height', 'emergency_contact_name', 'emergency_contact_phone',
+          'commissioner_signature', 'member_signature', 'issued_at', 'expires_at',
+          'created_at', 'updated_at', 'deleted', 'deleted_at', 'status',
+          'is_registered', 'approved_by', 'approved_at', 'correction_note',
+          'reviewed_by', 'reviewed_at', 'resubmitted', 'resubmitted_at',
+          'created_by_email'
+        ]) &&
+        data.id_number is string && data.id_number.size() > 0 && data.id_number.size() <= 64 &&
+        data.status in ['pending', 'needs_correction', 'approved', 'rejected'] &&
+        data.get('full_name_am', '') is string && data.get('full_name_am', '').size() <= 200 &&
+        data.get('full_name_en', '') is string && data.get('full_name_en', '').size() <= 200 &&
+        data.get('rank_am', '') is string && data.get('rank_am', '').size() <= 140 &&
+        data.get('rank_en', '') is string && data.get('rank_en', '').size() <= 140 &&
+        data.get('responsibility_am', '') is string && data.get('responsibility_am', '').size() <= 200 &&
+        data.get('responsibility_en', '') is string && data.get('responsibility_en', '').size() <= 200 &&
+        data.get('phone', '') is string && data.get('phone', '').size() <= 40 &&
+        data.get('fayda_number', '') is string && data.get('fayda_number', '').size() <= 64 &&
+        data.get('badge_number', '') is string && data.get('badge_number', '').size() <= 64 &&
+        data.get('photo_url', '') is string && data.get('photo_url', '').size() <= 1000000 &&
+        data.get('commissioner_signature', '') is string && data.get('commissioner_signature', '').size() <= 600000 &&
+        data.get('member_signature', '') is string && data.get('member_signature', '').size() <= 600000;
+    }
+
+    function isValidUserRecord(data) {
+      return data.keys().hasAll(['role', 'password']) &&
+        data.keys().hasOnly(['username', 'username_lower', 'email', 'password', 'role', 'active', 'created_at', 'updated_at']) &&
+        data.role in ['Administrator', 'Approver', 'Data Entry', 'Viewer'] &&
+        data.password is string && data.password.size() > 0 && data.password.size() <= 256 &&
+        data.get('username', '') is string && data.get('username', '').size() <= 120 &&
+        data.get('email', '') is string && data.get('email', '').size() <= 200;
+    }
+
+    function isValidPrintLog(data) {
+      return data.keys().hasAll(['id_number', 'id_doc_id', 'user_email', 'user_role', 'side', 'uid', 'timestamp']) &&
+        data.keys().hasOnly(['id_number', 'id_doc_id', 'user_email', 'user_role', 'side', 'uid', 'timestamp']) &&
+        data.id_number is string && data.id_number.size() > 0 && data.id_number.size() <= 64 &&
+        data.id_number.matches('^[A-Za-z0-9_\\-]+$') &&
+        data.id_doc_id is string && data.id_doc_id.size() > 0 && data.id_doc_id.size() <= 128 &&
+        data.id_doc_id.matches('^[a-zA-Z0-9_\\-]+$') &&
+        data.user_email is string && data.user_email.size() > 0 && data.user_email.size() <= 200 &&
+        data.user_role in ['Administrator', 'Approver', 'Data Entry'] &&
+        data.side in ['front', 'back', 'both', 'combined'] &&
+        data.uid is string && data.uid == request.auth.uid &&
+        data.timestamp == request.time;
+    }
+
+    function isValidScanLog(data) {
+      return data.keys().hasAll(['id_number', 'timestamp']) &&
+        data.keys().hasOnly(['id_number', 'status_at_scan', 'timestamp', 'ip', 'user_agent']) &&
+        data.id_number is string && data.id_number.size() > 0 && data.id_number.size() <= 64 &&
+        data.timestamp is string && data.timestamp.size() > 0 && data.timestamp.size() <= 64 &&
+        data.get('user_agent', '') is string && data.get('user_agent', '').size() <= 512;
+    }
+
     // ===============================================================
     // Collection Rules
     // ===============================================================
 
     match /ids/{id} {
-      allow read, write: if true;
+      // Only active authenticated staff can fetch individual ID documents directly;
+      // anonymous QR verification queries are strictly capped to limit(1).
+      allow get: if isSignedIn() && isValidId(id) && isActive();
+      allow list: if (isSignedIn() && isActive()) || (
+        isSignedIn() &&
+        request.query.limit != null &&
+        request.query.limit <= 1
+      );
+      allow create: if isSignedIn() && isValidId(id) && isValidIdRecord(incoming()) && (
+        isApprover() || (
+          isDataEntry() &&
+          incoming().status == 'pending' &&
+          incoming().get('is_registered', false) == false &&
+          incoming().get('deleted', false) == false
+        )
+      );
+      allow update: if isSignedIn() && isValidId(id) && isValidIdRecord(incoming()) && (
+        isAdmin() ||
+        isApprover() || (
+          isDataEntry() &&
+          existing().status != 'approved' &&
+          incoming().status in ['pending', 'needs_correction'] &&
+          incoming().get('is_registered', false) == false &&
+          incoming().get('deleted', false) == false
+        )
+      );
+      allow delete: if isAdmin() && isValidId(id);
     }
 
     match /users/{userId} {
-      allow read, write: if true;
+      // Prevent bulk scraping of staff credentials/emails by unauthenticated or anonymous users.
+      // Single-record lookup (limit <= 1) is permitted for login verification only.
+      allow get: if isSignedIn() && isValidId(userId) && (
+        isAdmin() ||
+        (hasValidProfile() && getUserData().get('user_doc_id', '') == userId)
+      );
+      allow list: if isAdmin() || (
+        isSignedIn() &&
+        request.query.limit != null &&
+        request.query.limit <= 1
+      );
+      allow create: if isAdmin() && isValidId(userId) && isValidUserRecord(incoming());
+      allow update: if isValidId(userId) && (
+        (isAdmin() && incoming().role in ['Administrator', 'Approver', 'Data Entry', 'Viewer'] && incoming().password is string && incoming().password.size() <= 256) || (
+          isSignedIn() &&
+          incoming().diff(existing()).affectedKeys().hasOnly(['password']) &&
+          !(existing().password.matches('^pbkdf2_sha256\\$.*')) &&
+          incoming().password is string &&
+          incoming().password.matches('^pbkdf2_sha256\\$.*') &&
+          incoming().password.size() <= 256
+        )
+      );
+      allow delete: if isAdmin() && isValidId(userId);
     }
 
     match /profiles/{uid} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && (request.auth.uid == uid || isAdmin());
+      allow create, update: if isSignedIn() && request.auth.uid == uid && isValidProfileDoc(incoming());
+      allow delete: if isAdmin();
     }
 
     match /scans/{scanId} {
-      allow read, write: if true;
+      allow read: if isSignedIn() && isActive();
+      allow create: if isSignedIn() && isValidId(scanId) && isValidScanLog(incoming());
+      allow update, delete: if false;
     }
 
     match /assets/{assetId} {
-      allow read: if true;
+      allow read: if isSignedIn() || (assetId is string);
       allow write: if isAdmin();
+    }
+
+    match /print_logs/{logId} {
+      allow get: if isSignedIn() && isValidId(logId) && (
+        isApprover() || existing().uid == request.auth.uid
+      );
+      allow list: if isSignedIn() && (
+        isApprover() || resource.data.uid == request.auth.uid
+      );
+      allow create: if isSignedIn() &&
+        isValidId(logId) &&
+        isValidPrintLog(incoming()) &&
+        isAuthorizedPrinter() &&
+        (isSuperAdmin() || incoming().user_email == currentUserEmail()) &&
+        exists(/databases/$(database)/documents/ids/$(incoming().id_doc_id)) &&
+        get(/databases/$(database)/documents/ids/$(incoming().id_doc_id)).data.id_number == incoming().id_number &&
+        get(/databases/$(database)/documents/ids/$(incoming().id_doc_id)).data.status == 'approved' &&
+        get(/databases/$(database)/documents/ids/$(incoming().id_doc_id)).data.get('deleted', false) != true;
+      allow update, delete: if false;
     }
   }
 }

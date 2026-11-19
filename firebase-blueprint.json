@@ -22,6 +22,16 @@
         "emergency_contact_name": { "type": "string", "description": "Emergency contact name" },
         "emergency_contact_phone": { "type": "string", "description": "Emergency contact phone" },
         "commissioner_signature": { "type": "string", "description": "URL to the commissioner's signature" },
+        "fayda_number": { "type": "string", "description": "Fayda Identification Number (FIN)" },
+        "status": { "type": "string", "enum": ["pending", "needs_correction", "approved", "rejected"], "description": "Approval status" },
+        "is_registered": { "type": "boolean", "description": "Whether officially registered in the system after approval" },
+        "approved_by": { "type": "string", "description": "Approver identifier" },
+        "approved_at": { "type": "string", "format": "date-time", "description": "Approval & registration timestamp" },
+        "correction_note": { "type": "string", "description": "Error note returned by approver" },
+        "reviewed_by": { "type": "string", "description": "Reviewer identifier" },
+        "reviewed_at": { "type": "string", "format": "date-time", "description": "Review timestamp" },
+        "resubmitted": { "type": "boolean", "description": "Whether corrected and resubmitted" },
+        "resubmitted_at": { "type": "string", "format": "date-time", "description": "Resubmission timestamp" },
         "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
       },
       "required": ["id_number", "full_name_am", "full_name_en"]
@@ -31,11 +41,13 @@
       "description": "A system user with specific roles",
       "type": "object",
       "properties": {
+        "username": { "type": "string", "description": "Login username" },
+        "username_lower": { "type": "string", "description": "Lowercase login username" },
         "email": { "type": "string", "format": "email", "description": "User email" },
-        "role": { "type": "string", "enum": ["Administrator", "Data Entry", "Viewer"], "description": "User role" },
+        "role": { "type": "string", "enum": ["Administrator", "Approver", "Data Entry", "Viewer"], "description": "User role" },
         "created_at": { "type": "string", "format": "date-time", "description": "Creation timestamp" }
       },
-      "required": ["email", "role"]
+      "required": ["role"]
     },
     "Scan": {
       "title": "Scan",
@@ -57,12 +69,29 @@
         "value": { "type": "string", "description": "Base64 or URL value of the asset" }
       },
       "required": ["value"]
+    },
+    "PrintLog": {
+      "title": "Print Log",
+      "description": "Immutable audit log entry recorded whenever an approved ID card is successfully printed by an authorized user",
+      "type": "object",
+      "properties": {
+        "id_number": { "type": "string", "description": "Printed ID number", "maxLength": 64, "pattern": "^[A-Za-z0-9_\\-]+$" },
+        "id_doc_id": { "type": "string", "description": "Firestore document ID of the printed ID record", "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "user_email": { "type": "string", "format": "email", "description": "Email of the authorized user who printed the ID", "maxLength": 200 },
+        "user_role": { "type": "string", "enum": ["Administrator", "Approver", "Data Entry"], "description": "Role of the user who printed the ID" },
+        "side": { "type": "string", "enum": ["front", "back", "both", "combined"], "description": "Printed card layout mode" },
+        "uid": { "type": "string", "description": "Firebase Auth UID of the user recording the print log", "maxLength": 128 },
+        "timestamp": { "type": "string", "format": "date-time", "description": "Server timestamp of the print event" }
+      },
+      "required": ["id_number", "id_doc_id", "user_email", "user_role", "side", "uid", "timestamp"]
     }
   },
   "firestore": {
     "/ids/{id}": { "schema": "IDRecord", "description": "Collection of ID records" },
     "/users/{userId}": { "schema": "User", "description": "Collection of system users" },
     "/scans/{scanId}": { "schema": "Scan", "description": "Collection of scan history" },
-    "/assets/{assetId}": { "schema": "Asset", "description": "Collection of system assets" }
+    "/assets/{assetId}": { "schema": "Asset", "description": "Collection of system assets" },
+    "/print_logs/{logId}": { "schema": "PrintLog", "description": "Immutable audit log of ID card print events" }
   }
 }
+
