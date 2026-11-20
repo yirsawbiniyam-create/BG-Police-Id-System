@@ -410,19 +410,10 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
           return;
         }
 
-        // Preserve normal passport/bust portrait ("ጉርድ ፎቶ") intact without slicing head or shoulders
-        const w = 312;
-        const h = 392;
-        const targetRatio = w / h;
-        const srcRatio = srcW / srcH;
-        let sx = 0, sy = 0, sw = srcW, sh = srcH;
-        if (srcRatio > targetRatio) {
-          sw = Math.round(srcH * targetRatio);
-          sx = Math.max(0, Math.round((srcW - sw) / 2));
-        } else {
-          sh = Math.round(srcW / targetRatio);
-          sy = 0;
-        }
+        // Preserve 100% of the FULL portrait ("ሙሉ ፎቶ") with zero cropping, scaled proportionally
+        const scale = Math.min(340 / srcW, 400 / srcH, 1);
+        const w = Math.max(1, Math.round(srcW * scale));
+        const h = Math.max(1, Math.round(srcH * scale));
 
         const workCanvas = document.createElement('canvas');
         workCanvas.width = w;
@@ -434,13 +425,14 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
         }
         wctx.imageSmoothingEnabled = true;
         wctx.imageSmoothingQuality = 'high';
-        wctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+        wctx.drawImage(img, 0, 0, w, h);
 
         const imageData = wctx.getImageData(0, 0, w, h);
         const data = imageData.data;
         const total = w * h;
 
-        // 1. Gently brighten clear uniform top/side studio backdrop toward white WITHOUT cutting or deleting the person
+        // 1. Detect uniform outer studio backdrop and flood-fill ONLY connected background pixels
+        // outside the person's head/torso to transparency so it blends smoothly with the ID card background
         const lum = new Float32Array(total);
         for (let i = 0; i < total; i++) {
           const p = i * 4;
@@ -456,8 +448,8 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
 
         let sumR = 0, sumG = 0, sumB = 0, cnt = 0;
         let minR = 255, maxR = 0, minG = 255, maxG = 0, minB = 255, maxB = 0;
-        for (let y = 0; y < 8; y++) {
-          for (let x = 0; x < 10; x++) {
+        for (let y = 0; y < Math.min(8, h); y++) {
+          for (let x = 0; x < Math.min(10, Math.floor(w / 2)); x++) {
             for (const cx of [x, w - 1 - x]) {
               const p = (y * w + cx) * 4;
               if (data[p + 3] > 200) {
@@ -476,7 +468,7 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
         const bgSpread = Math.max(maxR - minR, maxG - minG, maxB - minB);
         const bgLum = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
         const looksLikeSkin = (bgR - bgB > 28) && bgG < 200;
-        const hasUniformBackdrop = cnt > 0 && bgSpread <= 38 && bgLum >= 105 && !looksLikeSkin;
+        const hasUniformBackdrop = cnt > 0 && bgSpread <= 48 && bgLum >= 100 && !looksLikeSkin;
 
         if (hasUniformBackdrop) {
           const visited = new Uint8Array(total);
@@ -487,12 +479,12 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
             const p = idx * 4;
             if (data[p + 3] < 40) return true;
             const r = data[p], g = data[p + 1], b = data[p + 2];
-            // Protect face & central torso region so nothing in the portrait is ever altered
-            const fx = (x / w - 0.5) / 0.29;
-            const fy = (y / h - 0.44) / 0.34;
+            // Protect face & central torso region so nothing in the portrait is ever cut or erased
+            const fx = (x / w - 0.5) / 0.30;
+            const fy = (y / h - 0.45) / 0.35;
             if (fx * fx + fy * fy <= 1) return false;
             const dist = Math.hypot(r - bgR, g - bgG, b - bgB);
-            return dist <= 32 && edgeMag[idx] < 38;
+            return dist <= 38 && edgeMag[idx] < 42;
           };
 
           const enqueue = (x: number, y: number) => {
@@ -504,7 +496,7 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
           };
 
           for (let x = 0; x < w; x++) enqueue(x, 0);
-          for (let y = 1; y < Math.round(h * 0.72); y++) {
+          for (let y = 1; y < Math.round(h * 0.78); y++) {
             enqueue(0, y);
             enqueue(w - 1, y);
           }
@@ -512,10 +504,8 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
           while (head < tail) {
             const idx = queue[head++];
             const p = idx * 4;
-            // Shift studio background smoothly toward white instead of carving hard holes
-            data[p] = Math.round(data[p] * 0.16 + 255 * 0.84);
-            data[p + 1] = Math.round(data[p + 1] * 0.16 + 255 * 0.84);
-            data[p + 2] = Math.round(data[p + 2] * 0.16 + 255 * 0.84);
+            // Make studio backdrop transparent so the portrait merges directly with the ID card background
+            data[p + 3] = 0;
             const x = idx % w;
             const y = (idx - x) / w;
             if (x > 0) enqueue(x - 1, y);
@@ -523,18 +513,36 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
             if (y > 0) enqueue(x, y - 1);
             if (y < h - 1) enqueue(x, y + 1);
           }
+
+          // Soft 2px anti-aliased fringe transition around cleared background pixels
+          for (let y = 1; y < h - 1; y++) {
+            for (let x = 1; x < w - 1; x++) {
+              const idx = y * w + x;
+              if (visited[idx]) continue;
+              let adj = 0;
+              if (visited[idx - 1]) adj++;
+              if (visited[idx + 1]) adj++;
+              if (visited[idx - w]) adj++;
+              if (visited[idx + w]) adj++;
+              if (adj > 0) {
+                const p = idx * 4;
+                const keep = adj >= 2 ? 0.48 : 0.76;
+                data[p + 3] = Math.round(data[p + 3] * keep);
+              }
+            }
+          }
         }
 
-        // 2. Keep the FULL rectangular portrait completely intact (no circle/oval crop!),
-        // softly feathering ONLY the outermost 5-7% perimeter edges so it blends cleanly into the ID card background
+        // 2. Keep the FULL rectangular portrait intact (NO circle/oval crop!),
+        // softly feathering ONLY the outermost 4.5% edges so the portrait border blends seamlessly into the ID card background
         const smooth = (t: number) => {
           const c = Math.max(0, Math.min(1, t));
           return c * c * (3 - 2 * c);
         };
 
-        const featherX = Math.max(12, Math.round(w * 0.065));
-        const featherTop = Math.max(10, Math.round(h * 0.045));
-        const featherBottom = Math.max(14, Math.round(h * 0.075));
+        const featherX = Math.max(8, Math.round(w * 0.045));
+        const featherTop = Math.max(6, Math.round(h * 0.035));
+        const featherBottom = Math.max(10, Math.round(h * 0.055));
 
         for (let y = 0; y < h; y++) {
           const fyTop = y < featherTop ? smooth(y / featherTop) : 1;
@@ -548,10 +556,6 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
             const fxRight = x > w - 1 - featherX ? smooth((w - 1 - x) / featherX) : 1;
             const edgeKeep = fy * fxLeft * fxRight;
             if (edgeKeep < 1) {
-              const whiteMix = (1 - edgeKeep) * 0.45;
-              data[p] = Math.round(data[p] * (1 - whiteMix) + 255 * whiteMix);
-              data[p + 1] = Math.round(data[p + 1] * (1 - whiteMix) + 255 * whiteMix);
-              data[p + 2] = Math.round(data[p + 2] * (1 - whiteMix) + 255 * whiteMix);
               data[p + 3] = Math.round(data[p + 3] * edgeKeep);
             }
           }
@@ -888,19 +892,19 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
           </div>
         </div>
 
-        {/* Right Column: Borderless Cutout Portrait Blended Softly With White Halo + Fayda FIN Tag */}
-        <div className="w-[21mm] flex flex-col items-center justify-between py-0.5">
-          <div className="w-[20.5mm] h-[24mm] relative flex items-end justify-center overflow-visible">
+        {/* Right Column: Full Uncropped Rectangular Portrait Blended Into ID Card Background + Fayda FIN Tag */}
+        <div className="w-[21.5mm] flex flex-col items-center justify-between py-0.5">
+          <div className="w-[21mm] h-[25.5mm] relative flex items-center justify-center overflow-visible">
             {matchedPhoto ? (
               <img 
                 src={matchedPhoto} 
-                className="w-[20.5mm] h-[24mm] object-contain relative z-10" 
+                className="w-[21mm] h-[25.5mm] object-contain relative z-10" 
                 alt="Member" 
                 crossOrigin="anonymous"
               />
             ) : (
               <div
-                className="w-[15mm] h-[15mm] rounded-full flex items-center justify-center mb-2"
+                className="w-[16mm] h-[19mm] rounded-md flex items-center justify-center mb-1"
                 style={{ backgroundColor: 'rgba(255, 255, 255, 0.72)', color: '#94a3b8' }}
               >
                 <User size={24} />
@@ -1028,7 +1032,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             {isApproved ? (
               <div className="p-0.5 bg-white border rounded shadow-sm flex items-center justify-center" style={{ borderColor: '#cbd5e1' }}>
                 <QRCodeSVG 
-                  value={`${window.location.protocol}//${window.location.host}/verify/${data.id_number}`} 
+                  value={`${window.location.protocol}//${window.location.host}/verify/${encodeURIComponent(data.id_number || '')}`} 
                   size={64} 
                   level="H"
                 />
@@ -1687,7 +1691,14 @@ export function App() {
       q,
       (snapshot) => {
         const list = snapshot.docs
-          .map((d) => ({ ...(d.data() as any), id: d.id }))
+          .map((d) => {
+            const raw = d.data() as any;
+            return {
+              ...raw,
+              id: d.id,
+              is_registered: raw.status === 'approved' ? true : Boolean(raw.is_registered)
+            };
+          })
           .filter((r) => !r.deleted) as IDRecord[];
         setAllRecords(list);
       },
@@ -2604,7 +2615,7 @@ export function App() {
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent, approveAfterSave = false) => {
     e.preventDefault();
     setLoading(true);
     setTranslating(true);
@@ -2737,31 +2748,39 @@ export function App() {
       if (isUpdate) {
         try {
           const existingRecord = allRecords.find((r) => r.id === recordId);
-          const existingStatus = finalData.status ?? existingRecord?.status;
+          const existingStatus = finalData.status || existingRecord?.status;
           const safeStatus: 'pending' | 'needs_correction' | 'approved' | 'rejected' =
             existingStatus === 'approved' || existingStatus === 'needs_correction' || existingStatus === 'rejected' || existingStatus === 'pending'
               ? existingStatus
               : 'pending';
 
+          const shouldStayOrBecomeApproved =
+            safeStatus === 'approved' || (approveAfterSave && isApproverOrAdmin);
+
           const updatePayload: Record<string, any> = {
             ...cleanRecordCore,
-            id_number: sanitizeText(finalData.id_number ?? existingRecord?.id_number, 64) || `BGR-POL-1600001`,
-            status: safeStatus,
-            is_registered: Boolean(finalData.is_registered ?? existingRecord?.is_registered),
+            id_number: sanitizeText(finalData.id_number || existingRecord?.id_number, 64) || `BGR-POL-1600001`,
+            status: shouldStayOrBecomeApproved ? 'approved' : safeStatus,
+            is_registered: shouldStayOrBecomeApproved
+              ? true
+              : Boolean(finalData.is_registered ?? existingRecord?.is_registered),
             deleted: Boolean(finalData.deleted ?? existingRecord?.deleted),
-            correction_note: sanitizeText(finalData.correction_note ?? existingRecord?.correction_note, 500),
+            correction_note:
+              approveAfterSave && isApproverOrAdmin
+                ? ''
+                : sanitizeText(finalData.correction_note ?? existingRecord?.correction_note, 500),
             updated_at: new Date().toISOString()
           };
 
-          const createdAt = finalData.created_at ?? existingRecord?.created_at;
-          const createdByEmail = finalData.created_by_email ?? existingRecord?.created_by_email;
-          const approvedBy = finalData.approved_by ?? existingRecord?.approved_by;
-          const approvedAt = finalData.approved_at ?? existingRecord?.approved_at;
-          const reviewedBy = finalData.reviewed_by ?? existingRecord?.reviewed_by;
-          const reviewedAt = finalData.reviewed_at ?? existingRecord?.reviewed_at;
+          const createdAt = finalData.created_at || existingRecord?.created_at;
+          const createdByEmail = finalData.created_by_email || existingRecord?.created_by_email;
+          const approvedBy = finalData.approved_by || existingRecord?.approved_by;
+          const approvedAt = finalData.approved_at || existingRecord?.approved_at;
+          const reviewedBy = finalData.reviewed_by || existingRecord?.reviewed_by;
+          const reviewedAt = finalData.reviewed_at || existingRecord?.reviewed_at;
           const resubmitted = finalData.resubmitted ?? existingRecord?.resubmitted;
-          const resubmittedAt = finalData.resubmitted_at ?? existingRecord?.resubmitted_at;
-          const deletedAt = finalData.deleted_at ?? existingRecord?.deleted_at;
+          const resubmittedAt = finalData.resubmitted_at || existingRecord?.resubmitted_at;
+          const deletedAt = finalData.deleted_at || existingRecord?.deleted_at;
 
           if (typeof createdAt === 'string' && createdAt) updatePayload.created_at = createdAt;
           if (typeof createdByEmail === 'string' && createdByEmail) updatePayload.created_by_email = createdByEmail;
@@ -2773,7 +2792,18 @@ export function App() {
           if (typeof resubmittedAt === 'string' && resubmittedAt) updatePayload.resubmitted_at = resubmittedAt;
           if (typeof deletedAt === 'string' && deletedAt) updatePayload.deleted_at = deletedAt;
 
-          if (user?.role === 'Data Entry' || updatePayload.status === 'needs_correction') {
+          if (shouldStayOrBecomeApproved) {
+            const approverLabel = user?.username || user?.email || 'Approver';
+            const nowIso = new Date().toISOString();
+            updatePayload.status = 'approved';
+            updatePayload.is_registered = true;
+            if (!updatePayload.approved_by) updatePayload.approved_by = approverLabel;
+            if (!updatePayload.approved_at) updatePayload.approved_at = nowIso;
+            if (approveAfterSave) {
+              updatePayload.reviewed_by = approverLabel;
+              updatePayload.reviewed_at = nowIso;
+            }
+          } else if (user?.role === 'Data Entry' || updatePayload.status === 'needs_correction') {
             updatePayload.status = 'pending';
             updatePayload.is_registered = false;
             updatePayload.resubmitted = true;
@@ -2801,7 +2831,12 @@ export function App() {
           setSelectedRecord(updatedRecord);
           triggerBackgroundRefinement(recordId);
 
-          if (user?.role === 'Data Entry') {
+          if (updatePayload.status === 'approved') {
+            alert(t(
+              "የጸደቀው መታወቂያ ተስተካክሎ በሲስተሙ (Firestore) ውስጥ እንደተመዘገበ እና ትክክለኛ መሆኑ ቀጥሏል!",
+              "Approved ID updated and officially registered in Firestore!"
+            ));
+          } else if (user?.role === 'Data Entry') {
             alert(t(
               "መረጃው ተስተካክሎ ለአጽዳቂው በድጋሚ ተልኳል!",
               "Record fixed and resubmitted to the Approver!"
@@ -3454,6 +3489,23 @@ export function App() {
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6 sm:p-8 space-y-6">
+                  {formData.id && formData.status === 'approved' && (
+                    <div className="p-4 bg-emerald-50 border border-emerald-300 rounded-xl flex items-start gap-3">
+                      <CheckCircle2 className="text-emerald-600 shrink-0 mt-0.5" size={20} />
+                      <div>
+                        <p className="text-sm font-black text-emerald-900">
+                          {t('አፕሩቭ የተደረገ እና በሲስተሙ የተመዘገበ መታወቂያ', 'Approved & System-Registered ID Record')}
+                        </p>
+                        <p className="text-xs text-emerald-800 mt-1 font-semibold">
+                          {t(
+                            'ይህን መታወቂያ ኤዲት አድርገው ሲያስቀምጡም በሲስተሙ (Firestore) ውስጥ እንደጸደቀና ትክክለኛ መሆኑ ይቀጥላል፤ QR ስካን ሲደረግ የፊት ገፅ ትክክለኛነቱን ያሳያል።',
+                            'Editing and saving updates to this approved ID keeps it officially approved & registered in Firestore for QR verification.'
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {formData.id && (formData.status === 'needs_correction' || formData.correction_note) && (
                     <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl flex items-start gap-3">
                       <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={20} />
@@ -3547,9 +3599,9 @@ export function App() {
                     <div className="flex flex-col gap-5">
                       <div className="flex flex-col items-center justify-center p-5 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
                         <p className="text-xs font-extrabold text-[#1E3A8A] mb-3">{t('የአባሉ ፎቶ (Member Photo)', 'Member Photo')}</p>
-                        <div className="w-40 h-52 bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200 relative group">
+                        <div className="w-40 h-52 bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200 relative group flex items-center justify-center">
                           {formData.photo_url ? (
-                            <img src={formData.photo_url} className="w-full h-full object-cover" alt="Preview" />
+                            <img src={formData.photo_url} className="w-full h-full object-contain" alt="Preview" />
                           ) : (
                             <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 gap-2 p-2 text-center">
                               <Camera size={28} />
@@ -3690,20 +3742,35 @@ export function App() {
                       <ArrowLeft size={16} />
                       {t('ተመለስ / ይቅር', 'Back / Cancel')}
                     </button>
-                    <button
-                      type="submit"
-                      disabled={loading || translating}
-                      className="px-6 py-2.5 bg-[#1E40AF] hover:bg-[#1E3A8A] text-white rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 text-sm disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
-                    >
-                      {(loading || translating) ? <Loader2 className="animate-spin" size={17} /> : <Send size={16} />}
-                      {translating
-                        ? t('እየተተረጎመ...', 'Translating...')
-                        : formData.id
-                        ? (user?.role === 'Data Entry' || formData.status === 'needs_correction'
-                          ? t('አስተካክለህ ለአጽዳቂ ላክ', 'Fix & Resubmit to Approver')
-                          : t('መረጃ አሻሽል', 'Save Changes'))
-                        : t('አዘጋጅተህ ለአጽዳቂ ላክ', 'Prepare & Send to Approver')}
-                    </button>
+                    <div className="flex flex-wrap items-center gap-2.5">
+                      {formData.id && isApproverOrAdmin && formData.status !== 'approved' && (
+                        <button
+                          type="button"
+                          disabled={loading || translating}
+                          onClick={(e) => handleSubmit(e as any, true)}
+                          className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 text-sm disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
+                        >
+                          {(loading || translating) ? <Loader2 className="animate-spin" size={17} /> : <CheckCircle2 size={16} />}
+                          {t('አስተካክለህ አጽድቅና መዝግብ', 'Save & Approve ID')}
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={loading || translating}
+                        className="px-6 py-2.5 bg-[#1E40AF] hover:bg-[#1E3A8A] text-white rounded-xl font-bold shadow-sm transition-all flex items-center gap-2 text-sm disabled:opacity-50 whitespace-nowrap shrink-0 cursor-pointer"
+                      >
+                        {(loading || translating) ? <Loader2 className="animate-spin" size={17} /> : <Send size={16} />}
+                        {translating
+                          ? t('እየተተረጎመ...', 'Translating...')
+                          : formData.id
+                          ? (formData.status === 'approved'
+                            ? t('የጸደቀውን መረጃ አሻሽል', 'Save Approved ID Changes')
+                            : (user?.role === 'Data Entry' || formData.status === 'needs_correction'
+                              ? t('አስተካክለህ ለአጽዳቂ ላክ', 'Fix & Resubmit to Approver')
+                              : t('መረጃ አሻሽል', 'Save Changes')))
+                          : t('አዘጋጅተህ ለአጽዳቂ ላክ', 'Prepare & Send to Approver')}
+                      </button>
+                    </div>
                   </div>
                 </form>
               </div>
@@ -3906,7 +3973,7 @@ export function App() {
                       <tr key={record.id} className="hover:bg-slate-50/70 transition-colors">
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
-                            <img src={record.photo_url || 'https://picsum.photos/seed/police/80/80'} className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" alt="" />
+                            <img src={record.photo_url || 'https://picsum.photos/seed/police/80/100'} className="w-10 h-12 rounded-md object-contain bg-slate-50 border border-slate-200 shrink-0" alt="" />
                             <div className="min-w-0">
                               <p className="text-sm font-black text-slate-950 truncate">{record.full_name_am}</p>
                               <p className="text-xs font-bold text-slate-600 uppercase truncate">{record.full_name_en}</p>
@@ -5697,23 +5764,35 @@ function VerificationView({
 
         if (!querySnapshot.empty) {
           const recordDoc = querySnapshot.docs[0];
-          const recordData = { ...recordDoc.data(), id: recordDoc.id } as IDRecord;
+          const rawData = recordDoc.data() as any;
+          const recordData = {
+            ...rawData,
+            id: recordDoc.id,
+            is_registered: rawData.status === 'approved' ? true : Boolean(rawData.is_registered)
+          } as IDRecord;
+          const isApprovedRecord = !recordData.deleted && recordData.status === 'approved';
           statusAtScan = recordData.deleted ? 'deleted' : (recordData.status || 'pending');
+
+          const expiryDate = recordData.expires_at
+            ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(recordData.expires_at) ? `${recordData.expires_at}T23:59:59` : recordData.expires_at)
+            : null;
+          const isExpired = Boolean(expiryDate && !Number.isNaN(expiryDate.getTime()) && expiryDate < new Date());
 
           if (recordData.deleted) {
             setRecord(null);
             setVerifyState('deleted');
-          } else if (recordData.status !== 'approved' || recordData.is_registered === false) {
+          } else if (!isApprovedRecord) {
             // Unapproved IDs MUST NOT verify or display card data on scan
             setRecord(null);
             setVerifyState('unapproved');
-          } else if (recordData.expires_at && new Date(recordData.expires_at) < new Date()) {
+          } else if (isExpired) {
             setRecord(recordData);
             setVerifyState('expired');
             statusAtScan = 'expired';
           } else {
             setRecord(recordData);
             setVerifyState('approved');
+            statusAtScan = 'approved';
           }
         } else {
           setRecord(null);
@@ -5873,12 +5952,12 @@ function VerificationView({
         {verifyState === 'expired' ? (
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-200 rounded-xl text-xs sm:text-sm font-black mb-3 border border-amber-400/40 shadow-sm">
             <ShieldAlert size={18} />
-            {t('ትክክለኛ መዝገብ ሆኖ ጊዜው ያለፈበት መታወቂያ (EXPIRED)', 'Authentic Record — EXPIRED ID')}
+            {t('አፕሩቭ ተደርጎ የተመዘገበ — ጊዜው ያለፈበት (EXPIRED)', 'Approved & Registered — EXPIRED ID')}
           </div>
         ) : (
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/25 text-emerald-200 rounded-xl text-xs sm:text-sm font-black mb-3 border border-emerald-400/50 shadow-sm">
             <CheckCircle2 size={18} />
-            {t('ትክክለኛነቱ የተረጋገጠ ህጋዊ መታወቂያ · AUTHENTIC & VERIFIED', 'Authentic & Verified Official Police ID')}
+            {t('አፕሩቭ ተደርጎ በሲስተሙ ውስጥ የተመዘገበ ትክክለኛ መታወቂያ · AUTHENTIC & VERIFIED', 'Approved & Officially Registered — Authentic Police ID')}
           </div>
         )}
 
@@ -5901,8 +5980,8 @@ function VerificationView({
                 : 'bg-emerald-400/20 text-emerald-200 border border-emerald-400/40'
             }`}>
               {verifyState === 'expired'
-                ? t('የተመዘገበ ነገር ግን ጊዜው ያለፈበት', 'Registered — Expired')
-                : t('በፋየርስቶር የተመዘገበ ትክክለኛ መታወቂያ', 'Officially Registered in Firestore')}
+                ? t('አፕሩቭ የተደረገ ነገር ግን ጊዜው ያለፈበት', 'Approved — Expired')
+                : t('አፕሩቭ የተደረገ · በሲስተሙ (Firestore) የተመዘገበ ትክክለኛ መታወቂያ', 'Approved & Officially Registered in Firestore')}
             </span>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-white/10 text-xs">
