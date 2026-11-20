@@ -5732,21 +5732,17 @@ function UserManagement({
 
 function VerificationView({
   idNumber,
-  assets: initialAssets,
-  lang,
-  onChangeLang
+  assets: initialAssets
 }: {
   idNumber: string;
   assets: Assets;
-  lang: LangMode;
-  onChangeLang: (next: LangMode) => void;
+  lang?: LangMode;
+  onChangeLang?: (next: LangMode) => void;
 }) {
-  const t = (am: string, en: string) => (lang === 'am' ? am : en);
   const [record, setRecord] = useState<IDRecord | null>(null);
   const [verifyState, setVerifyState] = useState<'approved' | 'unapproved' | 'deleted' | 'expired' | 'not_found'>('not_found');
   const [assets, setAssets] = useState<Assets>(initialAssets);
   const [loading, setLoading] = useState(true);
-  const [scannedAt, setScannedAt] = useState<string>('');
   const matchedLogo = useCardMatchedLogo(assets.police_logo);
 
   // Strict read-only guard: block print, save, view-source, and copy shortcuts while on QR verification page
@@ -5770,7 +5766,6 @@ function VerificationView({
         }
         const cleanId = sanitizeText(decodeURIComponent(idNumber || ''), 64);
         const nowIso = new Date().toISOString();
-        setScannedAt(nowIso);
 
         if (!cleanId) {
           setRecord(null);
@@ -5861,35 +5856,6 @@ function VerificationView({
     fetchData();
   }, [idNumber]);
 
-  const TopBar = (
-    <div className="w-full max-w-2xl flex items-center justify-between gap-3 mb-6">
-      <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 border border-white/15 text-[#E5C158] text-xs font-extrabold whitespace-nowrap">
-        <Lock size={14} />
-        {t('የማረጋገጫ ገፅ ብቻ (Read-Only)', 'Read-Only Verification Only')}
-      </div>
-      <div className="inline-flex items-center bg-white/10 border border-white/15 p-0.5 rounded-xl">
-        <button
-          type="button"
-          onClick={() => onChangeLang('am')}
-          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-            lang === 'am' ? 'bg-[#C89B2B] text-[#0B1B3A]' : 'text-slate-300 hover:text-white'
-          }`}
-        >
-          አማ
-        </button>
-        <button
-          type="button"
-          onClick={() => onChangeLang('en')}
-          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-            lang === 'en' ? 'bg-[#C89B2B] text-[#0B1B3A]' : 'text-slate-300 hover:text-white'
-          }`}
-        >
-          EN
-        </button>
-      </div>
-    </div>
-  );
-
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#0B1B3A] select-none verify-readonly-block">
@@ -5898,56 +5864,30 @@ function VerificationView({
     );
   }
 
+  // Invalid / Unregistered / Unapproved / Deleted: Show ONLY Big Red X + "ትክክለኛ ያልሆነ ስካን"
   if (!record || verifyState === 'unapproved' || verifyState === 'deleted' || verifyState === 'not_found') {
-    const isUnapproved = verifyState === 'unapproved';
-    const isDeleted = verifyState === 'deleted';
     return (
       <div
         onContextMenu={(e) => e.preventDefault()}
         onDragStart={(e) => e.preventDefault()}
         onCopy={(e) => e.preventDefault()}
         onCut={(e) => e.preventDefault()}
-        className="min-h-screen flex flex-col items-center justify-center bg-[#0B1B3A] p-6 sm:p-10 text-center select-none verify-readonly-block"
+        className="min-h-screen flex flex-col items-center justify-center bg-[#0B1B3A] p-6 text-center select-none verify-readonly-block"
       >
-        {TopBar}
-        <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-8 flex flex-col items-center">
-          <div className="w-16 h-16 bg-red-50 border border-red-200 text-red-600 rounded-2xl flex items-center justify-center mb-5">
-            {isUnapproved ? <Lock size={32} /> : <X size={32} />}
+        <div className="flex flex-col items-center gap-6">
+          <div className="w-28 h-28 rounded-full bg-red-600/20 border-4 border-red-500 flex items-center justify-center shadow-[0_0_40px_rgba(239,68,68,0.45)]">
+            <X size={72} strokeWidth={3.5} className="text-red-500" />
           </div>
-          <h1 className="text-xl font-black text-slate-900">
-            {isUnapproved
-              ? t('ያልጸደቀ እና በሲስተም ያልተመዘገበ መታወቂያ', 'Unapproved & Unregistered ID Card')
-              : isDeleted
-              ? t('የተሰረዘ / ህጋዊ ያልሆነ መታወቂያ', 'Revoked / Invalid Official ID')
-              : t('ትክክለኛ ያልሆነ / ያልተገኘ መታወቂያ', 'Invalid or Unregistered ID')}
+          <h1 className="text-3xl sm:text-4xl font-black text-red-500 tracking-wide drop-shadow">
+            ትክክለኛ ያልሆነ ስካን
           </h1>
-          <p className="text-xs font-mono font-bold text-red-700 bg-red-50 border border-red-200 px-3 py-1 rounded-lg mt-3">
-            {decodeURIComponent(idNumber || '') || 'N/A'}
-          </p>
-          <p className="text-sm font-medium text-slate-600 mt-4 leading-relaxed">
-            {isUnapproved
-              ? t(
-                  'ይህ መታወቂያ እስካሁን በአጽዳቂው አልጸደቀም። አጽዳቂው "አጽድቅ" እስኪል ድረስ በሲስተሙ ውስጥ አልተመዘገበም እና ተቀባይነት የለውም።',
-                  'This ID card has NOT been approved by the Approver yet and is not authentic or valid.'
-                )
-              : isDeleted
-              ? t(
-                  'ይህ መታወቂያ ከሲስተሙ የተሰረዘ ስለሆነ ለአገልግሎት አይውልም።',
-                  'This ID card has been revoked from the official system and is no longer valid.'
-                )
-              : t(
-                  'ይህ መለያ ቁጥር በመረጃ ቋታችን ውስጥ አልተመዘገበም፤ እባክዎ ትክክለኛነቱን ያረጋግጡ።',
-                  'This ID number was not found in the official Benishangul-Gumuz Police Commission registry.'
-                )}
-          </p>
-          <div className="mt-6 w-full px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-extrabold flex items-center justify-center gap-2">
-            <ShieldAlert size={16} />
-            {t('ማረጋገጫ አልተሳካም · የመታወቂያ እይታ ተዘግቷል', 'Verification Failed · Access Restricted')}
-          </div>
         </div>
       </div>
     );
   }
+
+  // Approved (Valid or Expired): Strictly Read-Only Front Side ONLY
+  const isExpired = verifyState === 'expired';
 
   return (
     <div
@@ -5957,102 +5897,64 @@ function VerificationView({
       onCut={(e) => e.preventDefault()}
       className="min-h-screen bg-[#0B1B3A] flex flex-col items-center justify-center p-6 sm:p-10 select-none verify-readonly-block"
     >
-      {TopBar}
-      <div className="mb-6 text-center flex flex-col items-center max-w-xl">
-        <div
-          className="w-16 h-16 rounded-2xl border-2 border-[#C89B2B] shadow-xl flex items-center justify-center overflow-hidden mb-4"
-          style={{ background: ID_CARD_BACKGROUND }}
-        >
-          {matchedLogo ? (
-            <img src={matchedLogo} alt="BGR Police Logo" className="w-full h-full object-contain p-1.5 pointer-events-none" draggable={false} />
-          ) : (
-            <Shield size={30} className="text-[#0B1B3A]" />
-          )}
-        </div>
-
-        {verifyState === 'expired' ? (
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-200 rounded-xl text-xs sm:text-sm font-black mb-3 border border-amber-400/40 shadow-sm">
-            <ShieldAlert size={18} />
-            {t('አፕሩቭ ተደርጎ የተመዘገበ — ጊዜው ያለፈበት (EXPIRED)', 'Approved & Registered — EXPIRED ID')}
-          </div>
+      {/* Top Police Logo */}
+      <div
+        className="w-20 h-20 rounded-2xl border-2 border-[#C89B2B] shadow-xl flex items-center justify-center overflow-hidden mb-5"
+        style={{ background: ID_CARD_BACKGROUND }}
+      >
+        {matchedLogo ? (
+          <img
+            src={matchedLogo}
+            alt="BGR Police Logo"
+            className="w-full h-full object-contain p-1.5 pointer-events-none"
+            draggable={false}
+          />
         ) : (
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/25 text-emerald-200 rounded-xl text-xs sm:text-sm font-black mb-3 border border-emerald-400/50 shadow-sm">
-            <CheckCircle2 size={18} />
-            {t('አፕሩቭ ተደርጎ በሲስተሙ ውስጥ የተመዘገበ ትክክለኛ መታወቂያ · AUTHENTIC & VERIFIED', 'Approved & Officially Registered — Authentic Police ID')}
+          <Shield size={36} className="text-[#0B1B3A]" />
+        )}
+      </div>
+
+      {/* Approved Valid Header: Large Green Title + Green Right Checkmark Below */}
+      {!isExpired && (
+        <div className="flex flex-col items-center text-center mb-8 gap-4">
+          <h1 className="text-2xl sm:text-4xl font-black text-emerald-400 leading-tight drop-shadow">
+            የቤኒሻንጉል ጉሙዝ ፖሊስ ዲጂታል መታወቂያ ካርድ
+          </h1>
+          <div className="w-16 h-16 rounded-full bg-emerald-500/20 border-3 border-emerald-400 flex items-center justify-center shadow-[0_0_28px_rgba(52,211,153,0.4)]">
+            <Check size={40} strokeWidth={3.5} className="text-emerald-400" />
+          </div>
+        </div>
+      )}
+
+      {/* ID Card Front Side ONLY (+ Red "የማያገለግል መታወቂያ" stamp over card if expired) */}
+      <div className={`relative scale-[0.9] sm:scale-110 lg:scale-125 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.55)] rounded-[3.18mm] ${isExpired ? 'mt-4' : 'my-4'}`}>
+        <IDCardFront data={record} assets={assets} />
+
+        {isExpired && (
+          <div
+            className="absolute inset-0 z-30 pointer-events-none rounded-[3.18mm] flex items-center justify-center"
+            style={{
+              backgroundColor: 'rgba(185, 28, 28, 0.22)',
+              border: '2.5px solid #dc2626'
+            }}
+          >
+            <div
+              className="-rotate-12 px-5 py-2.5 rounded-lg border-3 shadow-2xl text-center"
+              style={{
+                backgroundColor: 'rgba(185, 28, 28, 0.92)',
+                borderColor: '#fecaca',
+                color: '#ffffff'
+              }}
+            >
+              <span className="text-sm sm:text-base font-black tracking-wide whitespace-nowrap">
+                የማያገለግል መታወቂያ
+              </span>
+            </div>
           </div>
         )}
 
-        <h1 className="text-white text-lg sm:text-xl font-black">
-          {t('የቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን', 'Benishangul-Gumuz Region Police Commission')}
-        </h1>
-        <p className="text-slate-200 text-xs font-bold mt-1">
-          {t('የመታወቂያ የፊት ገፅ እና የትክክለኛነት ማረጋገጫ ብቻ', 'Official Front-Side ID & Authenticity Verification Only')}
-        </p>
-
-        {/* Official Authenticity Confirmation Details */}
-        <div className="mt-4 w-full bg-white/8 border border-white/15 rounded-2xl p-4 text-left space-y-2 backdrop-blur-xs">
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <span className="text-[11px] font-bold text-slate-300 uppercase">
-              {t('የማረጋገጫ ሁኔታ', 'Authenticity Status')}
-            </span>
-            <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black ${
-              verifyState === 'expired'
-                ? 'bg-amber-400/20 text-amber-200 border border-amber-400/40'
-                : 'bg-emerald-400/20 text-emerald-200 border border-emerald-400/40'
-            }`}>
-              {verifyState === 'expired'
-                ? t('አፕሩቭ የተደረገ ነገር ግን ጊዜው ያለፈበት', 'Approved — Expired')
-                : t('አፕሩቭ የተደረገ · በሲስተሙ (Firestore) የተመዘገበ ትክክለኛ መታወቂያ', 'Approved & Officially Registered in Firestore')}
-            </span>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-white/10 text-xs">
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">{t('መለያ ቁጥር', 'ID Number')}</p>
-              <p className="font-mono font-black text-[#FEF9C3]">{record.id_number}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">{t('የተሰጠበት ቀን', 'Issued Date')}</p>
-              <p className="font-bold text-white tabular-nums">{record.issued_at || 'N/A'}</p>
-            </div>
-            <div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase">{t('የሚያበቃበት ቀን', 'Expiry Date')}</p>
-              <p className={`font-bold tabular-nums ${verifyState === 'expired' ? 'text-amber-300' : 'text-emerald-300'}`}>
-                {record.expires_at || 'N/A'}
-              </p>
-            </div>
-          </div>
-          {record.approved_by && (
-            <p className="text-[#E5C158] text-[11px] font-bold pt-1 border-t border-white/10">
-              {t('ያጸደቀው አካል፡', 'Approved & Registered by:')} {record.approved_by}
-            </p>
-          )}
-          {scannedAt && (
-            <p className="text-slate-400 text-[10px] font-mono">
-              {t('የተረጋገጠበት ሰዓት፡', 'Verified at:')} {new Date(scannedAt).toLocaleString()}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Front Side ONLY (Protected Read-Only View — Back Side & Dashboard strictly hidden) */}
-      <div className="flex flex-col items-center gap-3 my-4">
-        <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#E5C158]">
-          {t('የመታወቂያው የፊት ገፅ (Front Side Only)', 'Official ID Front Side (Read-Only)')}
-        </span>
-        <div className="relative scale-[0.88] sm:scale-110 lg:scale-125 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm] my-4">
-          <IDCardFront data={record} assets={assets} />
-          {/* Transparent shield prevents dragging/saving portrait or copying card text */}
-          <div className="absolute inset-0 z-40 bg-transparent" aria-hidden="true" />
-        </div>
-      </div>
-
-      <div className="mt-12 max-w-md text-center space-y-1.5">
-        <p className="text-slate-200 text-xs font-bold leading-relaxed">
-          {t(
-            'ጥብቅ የደህንነት ማሳሰቢያ፡ ይህ ገፅ የመታወቂያውን የፊት ገፅና ትክክለኛነት ለማረጋገጥ ብቻ የተዘጋጀ ነው። ወደ ዋናው ዳሽቦርድ መግባት፣ ማተም ወይም መረጃ መቀየር በጥብቅ የተከለከለ ነው።',
-            'Strict Security Notice: This QR verification page displays only the ID front side and authenticity confirmation. Dashboard access, editing, copying, and printing are strictly disabled.'
-          )}
-        </p>
+        {/* Transparent shield strictly blocks dragging, saving, inspecting, or copying card contents */}
+        <div className="absolute inset-0 z-40 bg-transparent" aria-hidden="true" />
       </div>
     </div>
   );
