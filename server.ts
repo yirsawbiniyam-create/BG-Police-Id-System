@@ -31,22 +31,76 @@ async function startServer() {
   app.disable("x-powered-by");
   app.use(express.json({ limit: "256kb" }));
 
-  // Harden HTTP Security Headers
+  const CRAWLER_UA_PATTERN =
+    /(googlebot|google-inspectiontool|google-extended|googleother|adsbot-google|mediapartners-google|bingbot|msnbot|slurp|duckduckbot|baiduspider|yandex(bot|images)?|sogou|exabot|applebot|ia_archiver|archive\.org_bot|semrushbot|ahrefsbot|mj12bot|dotbot|gptbot|oai-searchbot|chatgpt-user|ccbot|perplexitybot|claudebot|anthropic-ai|bytespider|amazonbot|facebookexternalhit|facebot|twitterbot|linkedinbot|whatsapp|telegrambot|slackbot|discordbot)/i;
+
+  const ROBOTS_TXT_BODY = [
+    "# Restricted Institutional Police ID System",
+    "User-agent: Googlebot",
+    "Disallow: /",
+    "User-agent: Googlebot-Image",
+    "Disallow: /",
+    "User-agent: AdsBot-Google",
+    "Disallow: /",
+    "User-agent: Google-Extended",
+    "Disallow: /",
+    "User-agent: Bingbot",
+    "Disallow: /",
+    "User-agent: DuckDuckBot",
+    "Disallow: /",
+    "User-agent: Baiduspider",
+    "Disallow: /",
+    "User-agent: Yandex",
+    "Disallow: /",
+    "User-agent: *",
+    "Disallow: /",
+  ].join("\n");
+
+  // Harden HTTP Security & Strict Anti-Indexing Headers
   app.use((req, res, next) => {
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.setHeader("X-Frame-Options", "SAMEORIGIN");
     res.setHeader("X-XSS-Protection", "1; mode=block");
-    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    res.setHeader("Referrer-Policy", "no-referrer");
     res.setHeader("Cross-Origin-Opener-Policy", "same-origin-allow-popups");
     res.setHeader("X-Permitted-Cross-Domain-Policies", "none");
-    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    res.setHeader("X-Robots-Tag", "noindex, nofollow, noarchive, nosnippet, noimageindex, notranslate");
     res.setHeader("Permissions-Policy", "camera=(self), microphone=(), geolocation=()");
     next();
   });
 
-  app.use("/api", (req, res, next) => {
+  // Explicit crawler directives & sitemap removal
+  app.get("/robots.txt", (req, res) => {
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
     res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
-    res.setHeader("Pragma", "no-cache");
+    res.status(200).send(ROBOTS_TXT_BODY);
+  });
+
+  app.get(["/sitemap.xml", "/sitemap_index.xml"], (req, res) => {
+    res.status(410).type("text/plain").send("Gone");
+  });
+
+  // Actively block search engine, AI, archive, and link-preview crawlers from fetching any route
+  app.use((req, res, next) => {
+    const ua = String(req.headers["user-agent"] || "");
+    if (ua && CRAWLER_UA_PATTERN.test(ua)) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      return res
+        .status(403)
+        .type("text/plain")
+        .send("403 Forbidden - Restricted Institutional System. Search engine indexing and crawling are prohibited.");
+    }
+    next();
+  });
+
+  // Prevent browser/proxy caching of dynamic pages and API responses
+  app.use((req, res, next) => {
+    const accept = String(req.headers.accept || "");
+    if (req.path.startsWith("/api") || req.path === "/" || req.path.startsWith("/verify") || accept.includes("text/html")) {
+      res.setHeader("Cache-Control", "no-store, no-cache, must-revalidate, private");
+      res.setHeader("Pragma", "no-cache");
+      res.setHeader("Expires", "0");
+    }
     next();
   });
 

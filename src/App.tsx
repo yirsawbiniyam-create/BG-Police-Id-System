@@ -1262,6 +1262,23 @@ export function App() {
       setViewState('dashboard');
     }
   };
+
+  // Enforce strict anti-indexing & non-discovery head directives at runtime across all views
+  useEffect(() => {
+    const upsertMeta = (name: string, content: string) => {
+      let el = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
+      if (!el) {
+        el = document.createElement('meta');
+        el.name = name;
+        document.head.appendChild(el);
+      }
+      el.content = content;
+    };
+    upsertMeta('robots', 'noindex, nofollow, noarchive, nosnippet, noimageindex, nocache, noodp, noydir, max-snippet:0, max-image-preview:none, max-video-preview:0');
+    upsertMeta('googlebot', 'noindex, nofollow, noarchive, nosnippet, noimageindex, max-snippet:0, max-image-preview:none, max-video-preview:0');
+    upsertMeta('bingbot', 'noindex, nofollow, noarchive, nosnippet, noimageindex');
+    upsertMeta('referrer', 'no-referrer');
+  }, []);
   const [searchQuery, setSearchQuery] = useState('');
   const [allRecords, setAllRecords] = useState<IDRecord[]>([]);
   const [statusFilter, setStatusFilter] = useState<'all' | 'pending' | 'needs_correction' | 'approved' | 'rejected'>('all');
@@ -5109,7 +5126,11 @@ function Login({
             {loading && <Loader2 className="animate-spin" size={17} />}
             {t('ወደ ሲስተሙ ይግቡ', 'Sign In to Portal')}
           </button>
-          <div className="text-center pt-4 border-t border-slate-200">
+          <div className="text-center pt-4 border-t border-slate-200 space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-slate-100 border border-slate-200 text-[#0B1B3A] text-[10px] font-extrabold">
+              <Lock size={12} className="text-[#B45309]" />
+              {t('ለተቋሙ ብቻ የተዘጋጀ ሚስጥራዊ ሲስተም · በጎግል ፍለጋ አይታይም', 'Private Institutional System · Search Engine Indexing Disabled')}
+            </div>
             <p className="text-[11px] font-bold text-slate-700 leading-relaxed">
               {t('በቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን ቴክኖሎጂ ማስፋፊያ ክፍል የተሰራ', 'Developed by BGR Police Commission Technology Expansion Department')}
             </p>
