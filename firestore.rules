@@ -240,8 +240,19 @@ service cloud.firestore {
     }
 
     match /assets/{assetId} {
-      allow read: if isSignedIn() || (assetId is string);
-      allow write: if isAdmin();
+      // Allow individual gets for public branding assets before login (Login & QR screens);
+      // sensitive assets (commissioner_signature) require an active authenticated staff profile.
+      allow get: if isValidId(assetId) && (
+        assetId in ['police_logo', 'bgr_flag', 'eth_flag'] ||
+        (isSignedIn() && isActive())
+      );
+      allow list: if false;
+      allow create, update: if isAdmin() && isValidId(assetId) &&
+        incoming().keys().hasAll(['value']) &&
+        incoming().keys().hasOnly(['value', 'updated_at']) &&
+        incoming().value is string && incoming().value.size() <= 1000000 &&
+        incoming().get('updated_at', '') is string && incoming().get('updated_at', '').size() <= 64;
+      allow delete: if isAdmin() && isValidId(assetId);
     }
 
     match /print_logs/{logId} {

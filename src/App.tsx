@@ -740,16 +740,16 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
       </div>
 
       {/* Header */}
-      <div className="relative z-10 flex justify-between items-start h-[10.8mm] px-2 pt-0.5 pb-1 border-b border-black/10">
+      <div className="relative z-10 flex justify-between items-start h-[9.6mm] px-2 pt-0.5 pb-0.5 border-b border-black/10">
         <img 
           src={assets.bgr_flag || "https://picsum.photos/seed/bgr/100/60"} 
-          className="h-6.5 w-11 object-cover rounded-sm shadow-sm" 
+          className="h-6 w-10.5 object-cover rounded-sm shadow-sm" 
           alt="BGR Flag" 
           crossOrigin="anonymous"
         />
         <div className="flex flex-col items-center -mt-1">
           <div
-            className="w-11 h-11 rounded-full overflow-hidden flex items-center justify-center"
+            className="w-10 h-10 rounded-full overflow-hidden flex items-center justify-center"
             style={{
               background: ID_CARD_BACKGROUND,
               border: '1.5px solid rgba(217, 119, 6, 0.45)'
@@ -765,23 +765,38 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
         </div>
         <img 
           src={assets.eth_flag || "https://picsum.photos/seed/eth/100/60"} 
-          className="h-6.5 w-11 object-cover rounded-sm shadow-sm" 
+          className="h-6 w-10.5 object-cover rounded-sm shadow-sm" 
           alt="ETH Flag" 
           crossOrigin="anonymous"
         />
       </div>
 
-      {/* Commission Name */}
-      <div className="relative z-10 text-center mb-0.5 mt-0.5">
-        <h1 className="text-[7.6px] font-black leading-[1.12]" style={{ color: '#000000' }}>የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
-        <h2 className="text-[6px] font-extrabold uppercase tracking-[0.02em] leading-[1.12] mt-0.5" style={{ color: '#0f172a' }}>Benishangul-Gumuz Region Police Commission</h2>
+      {/* Commission Name & Digital ID Title */}
+      <div className="relative z-10 text-center mb-[1.5px] mt-[1.5px]">
+        <h1 className="text-[7.5px] font-black leading-[1.08]" style={{ color: '#0b1b3a' }}>የቤንሻንጉል ጉምዝ ክልል ፖሊስ ኮሚሽን</h1>
+        <h2 className="text-[5.7px] font-extrabold uppercase tracking-[0.02em] leading-[1.08] mt-[1px]" style={{ color: '#1d4ed8' }}>Benishangul-Gumuz Region Police Commission</h2>
+        <div className="flex justify-center mt-[1.5px]">
+          <span
+            className="inline-flex items-center gap-1 px-2.5 py-[1px] rounded-full text-[5.7px] font-black tracking-[0.04em] leading-none"
+            style={{
+              background: 'linear-gradient(90deg, #ecfdf5 0%, #fef9c3 50%, #ecfdf5 100%)',
+              color: '#991b1b',
+              border: '0.8px solid #047857',
+              boxShadow: '0 1px 2px rgba(4, 120, 87, 0.14)'
+            }}
+          >
+            <span className="w-1 h-1 rounded-full inline-block" style={{ backgroundColor: '#047857' }} />
+            የፖሊስ ዲጂታል መታወቂያ ካርድ
+            <span className="w-1 h-1 rounded-full inline-block" style={{ backgroundColor: '#047857' }} />
+          </span>
+        </div>
       </div>
 
       {/* Main Content Area */}
       <div className="relative z-10 flex flex-1 gap-1 px-1 overflow-hidden">
         {/* Left Column: Details */}
         <div className="w-[55.5mm] flex flex-col justify-center py-0.5">
-          <div className="space-y-[2px]">
+          <div className="space-y-[1.8px]">
             {/* Signature Two-Tone Royal Crimson & Burnished Gold ID Number Crest */}
             <div
               className="flex items-stretch justify-between rounded-md overflow-hidden shadow-sm w-full"
@@ -792,7 +807,7 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
               }}
             >
               <div
-                className="flex items-center gap-1 px-1.5 py-[1.8px] shrink-0"
+                className="flex items-center gap-1 px-1.5 py-[1.6px] shrink-0"
                 style={{
                   background: 'linear-gradient(135deg, #fef08a 0%, #fbbf24 55%, #d97706 100%)',
                   borderRight: '1px solid #f59e0b'
@@ -802,18 +817,18 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
                   className="w-1.5 h-1.5 rotate-45 inline-block shrink-0"
                   style={{ backgroundColor: '#7f1d1d' }}
                 />
-                <span className="text-[4.6px] font-black uppercase tracking-[0.04em] leading-none" style={{ color: '#0f172a' }}>
+                <span className="text-[4.6px] font-black uppercase tracking-[0.04em] leading-none" style={{ color: '#0b1b3a' }}>
                   መለያ ቁጥር · ID NO
                 </span>
               </div>
               <div
-                className="flex-1 flex items-center justify-center px-2 py-[1.8px]"
+                className="flex-1 flex items-center justify-center px-2 py-[1.6px]"
                 style={{
                   background: 'linear-gradient(135deg, #881337 0%, #7f1d1d 45%, #3b0764 100%)'
                 }}
               >
                 <span
-                  className="text-[8.2px] font-black tracking-[0.11em] font-mono leading-none"
+                  className="text-[8px] font-black tracking-[0.11em] font-mono leading-none"
                   style={{ color: '#fef9c3', textShadow: '0 1px 1px rgba(0, 0, 0, 0.45)' }}
                 >
                   {data.id_number || "BGR-POL-1600000"}
@@ -821,33 +836,33 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
               </div>
             </div>
             
-            <div className="px-1 py-[2px] rounded-sm border-l-2" style={{ borderLeftColor: '#1e3a8a', backgroundColor: 'rgba(255, 255, 255, 0.88)' }}>
-              <div className="text-[4.4px] font-extrabold uppercase leading-none" style={{ color: '#0f172a' }}>ሙሉ ስም / FULL NAME</div>
-              <div className="text-[8.2px] font-black leading-[1.15] whitespace-normal break-words" style={{ color: '#000000' }}>{data.full_name_am}</div>
-              <div className="text-[6.8px] font-black uppercase leading-[1.12] whitespace-normal break-words" style={{ color: '#0f172a' }}>{data.full_name_en}</div>
+            <div className="px-1 py-[1.8px] rounded-sm border-l-2" style={{ borderLeftColor: '#1d4ed8', backgroundColor: 'rgba(255, 255, 255, 0.90)' }}>
+              <div className="text-[4.4px] font-black uppercase leading-none" style={{ color: '#b45309' }}>ሙሉ ስም / FULL NAME</div>
+              <div className="text-[8px] font-black leading-[1.12] whitespace-normal break-words" style={{ color: '#0b1b3a' }}>{data.full_name_am}</div>
+              <div className="text-[6.6px] font-black uppercase leading-[1.1] whitespace-normal break-words" style={{ color: '#065f46' }}>{data.full_name_en}</div>
             </div>
 
             <div className="grid grid-cols-[37%_63%] gap-1 items-start">
               <div className="min-w-0">
-                <div className="text-[4.4px] font-extrabold uppercase leading-none mb-[1px]" style={{ color: '#0f172a' }}>ማዕረግ / RANK</div>
-                <div className={`font-black whitespace-normal break-words ${rankTextClass}`} style={{ color: '#000000' }}>
+                <div className="text-[4.4px] font-black uppercase leading-none mb-[1px]" style={{ color: '#1d4ed8' }}>ማዕረግ / RANK</div>
+                <div className={`font-black whitespace-normal break-words ${rankTextClass}`} style={{ color: '#7c2d12' }}>
                   {data.rank_am}
                   {data.rank_en ? (
                     <>
                       {' / '}
-                      <span className={`font-extrabold uppercase ${rankEnClass}`} style={{ color: '#0f172a' }}>{data.rank_en}</span>
+                      <span className={`font-extrabold uppercase ${rankEnClass}`} style={{ color: '#1e293b' }}>{data.rank_en}</span>
                     </>
                   ) : null}
                 </div>
               </div>
               <div className="min-w-0">
-                <div className="text-[4.4px] font-extrabold uppercase leading-none mb-[1px]" style={{ color: '#0f172a' }}>ኃላፊነት / RESPONSIBILITY</div>
-                <div className={`font-black whitespace-normal break-words ${respTextClass}`} style={{ color: '#000000' }}>
+                <div className="text-[4.4px] font-black uppercase leading-none mb-[1px]" style={{ color: '#047857' }}>ኃላፊነት / RESPONSIBILITY</div>
+                <div className={`font-black whitespace-normal break-words ${respTextClass}`} style={{ color: '#1e1b4b' }}>
                   {data.responsibility_am}
                   {data.responsibility_en ? (
                     <>
                       {' / '}
-                      <span className={`font-extrabold uppercase ${respEnClass}`} style={{ color: '#0f172a' }}>{data.responsibility_en}</span>
+                      <span className={`font-extrabold uppercase ${respEnClass}`} style={{ color: '#991b1b' }}>{data.responsibility_en}</span>
                     </>
                   ) : null}
                 </div>
@@ -856,21 +871,21 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
 
             <div className="grid grid-cols-2 gap-1 mt-0.5 pt-0.5 border-t" style={{ borderTopColor: 'rgba(15, 23, 42, 0.2)' }}>
               <div>
-                <div className="text-[4.8px] font-extrabold uppercase leading-none" style={{ color: '#0f172a' }}>የተሰጠበት ቀን / Issued Date</div>
-                <div className="text-[6.2px] font-black leading-tight mt-[1px]" style={{ color: '#000000' }}>{data.issued_at || "N/A"}</div>
+                <div className="text-[4.7px] font-black uppercase leading-none" style={{ color: '#1d4ed8' }}>የተሰጠበት ቀን / Issued Date</div>
+                <div className="text-[6.1px] font-black leading-tight mt-[1px]" style={{ color: '#065f46' }}>{data.issued_at || "N/A"}</div>
               </div>
               <div>
-                <div className="text-[4.8px] font-extrabold uppercase leading-none" style={{ color: '#0f172a' }}>የሚያበቃበት ቀን / Expiry Date</div>
-                <div className="text-[6.2px] font-black leading-tight mt-[1px]" style={{ color: '#b91c1c' }}>{data.expires_at || "N/A"}</div>
+                <div className="text-[4.7px] font-black uppercase leading-none" style={{ color: '#9f1239' }}>የሚያበቃበት ቀን / Expiry Date</div>
+                <div className="text-[6.1px] font-black leading-tight mt-[1px]" style={{ color: '#dc2626' }}>{data.expires_at || "N/A"}</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Right Column: Borderless Portrait Blended Softly Toward White into Card Background */}
-        <div className="w-[21mm] flex flex-col items-center justify-center">
+        {/* Right Column: Borderless Portrait Blended Softly Toward White + Fayda FIN Tag */}
+        <div className="w-[21mm] flex flex-col items-center justify-between py-0.5">
           <div
-            className="w-[20.5mm] h-[25.5mm] relative flex items-end justify-center"
+            className="w-[20mm] h-[23mm] relative flex items-end justify-center"
             style={{
               background: 'radial-gradient(ellipse 68% 72% at 50% 48%, rgba(255, 255, 255, 0.88) 0%, rgba(255, 251, 235, 0.45) 52%, rgba(255, 255, 255, 0) 76%)'
             }}
@@ -878,18 +893,32 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
             {matchedPhoto ? (
               <img 
                 src={matchedPhoto} 
-                className="w-[19.5mm] h-[24.5mm] object-contain relative z-10" 
+                className="w-[19mm] h-[22mm] object-contain relative z-10" 
                 alt="Member" 
                 crossOrigin="anonymous"
               />
             ) : (
               <div
-                className="w-[16mm] h-[16mm] rounded-full flex items-center justify-center mb-3"
+                className="w-[15mm] h-[15mm] rounded-full flex items-center justify-center mb-2"
                 style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)', color: '#94a3b8' }}
               >
-                <User size={26} />
+                <User size={24} />
               </div>
             )}
+          </div>
+          <div
+            className="w-full px-1 py-[1.2px] rounded text-center leading-none"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.92)',
+              border: '0.8px solid #1d4ed8'
+            }}
+          >
+            <div className="text-[3.8px] font-black uppercase leading-none" style={{ color: '#1e3a8a' }}>
+              ፋይዳ / FAYDA FIN
+            </div>
+            <div className="text-[5.2px] font-black font-mono tracking-tight leading-tight truncate mt-[0.5px]" style={{ color: '#991b1b' }}>
+              {(data.fayda_number || '').trim() || "N/A"}
+            </div>
           </div>
         </div>
       </div>
@@ -942,47 +971,47 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             </div>
             <div className="flex-1 h-[0.3mm]" style={{ background: 'linear-gradient(to right, rgba(220,38,38,0.4), transparent)' }}></div>
           </div>
-          <p className="text-[6.8px] font-extrabold leading-[1.26] text-left" style={{ color: '#000000' }}>
+          <p className="text-[6.8px] font-extrabold leading-[1.26] text-left" style={{ color: '#0b1b3a' }}>
             ይህንን መታወቂያ የያዘ የፖሊስ አባል ስለሆነ ህግን የማስከበር ስልጣን ተሰጥቶታል ፣ መታወቂያዉንም የማሳየት ግዴታ አለበት፡፡ መታወቂያው ቢጠፋ ወይም በሌላ ግለሰብ እጅ ቢገኝ በአቅራቢያው ለሚገኝ ፖሊስ ጣቢያ እንዲያስረክቡ እናሳስባለን፡፡
           </p>
-          <p className="text-[5.8px] font-bold leading-[1.22] text-left" style={{ color: '#0f172a' }}>
+          <p className="text-[5.8px] font-bold leading-[1.22] text-left" style={{ color: '#065f46' }}>
             The Bearer of this ID card is a member of Police and is authorized to enforce the Law. He/she is obliged to present this ID card. If found, please return it to the nearest police station.
           </p>
         </div>
 
-        {/* Middle: Details in Two Lines */}
+        {/* Middle: Details in Two Lines (Distinct Label vs Value Colors) */}
         <div className="py-0.5 flex flex-col gap-0.5 border-b" style={{ borderBottomColor: '#cbd5e1' }}>
           <div className="flex items-center justify-center gap-2.5">
             <div className="flex items-center gap-1">
-              <span className="text-[4.6px] font-extrabold uppercase" style={{ color: '#0f172a' }}>ፆታ / GENDER:</span>
-              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.gender === 'M' ? 'ወ / M' : data.gender === 'F' ? 'ሴ / F' : (data.gender || "N/A")}</span>
+              <span className="text-[4.6px] font-black uppercase" style={{ color: '#b45309' }}>ፆታ / GENDER:</span>
+              <span className="text-[7px] font-black" style={{ color: '#0b1b3a' }}>{data.gender === 'M' ? 'ወ / M' : data.gender === 'F' ? 'ሴ / F' : (data.gender || "N/A")}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4.6px] font-extrabold uppercase" style={{ color: '#0f172a' }}>ቁመት / HEIGHT:</span>
-              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.height || "N/A"}</span>
+              <span className="text-[4.6px] font-black uppercase" style={{ color: '#1d4ed8' }}>ቁመት / HEIGHT:</span>
+              <span className="text-[7px] font-black" style={{ color: '#065f46' }}>{data.height || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4.6px] font-extrabold uppercase" style={{ color: '#0f172a' }}>መልክ / COMPLEXION:</span>
-              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.complexion || "N/A"}</span>
+              <span className="text-[4.6px] font-black uppercase" style={{ color: '#047857' }}>መልክ / COMPLEXION:</span>
+              <span className="text-[7px] font-black" style={{ color: '#4338ca' }}>{data.complexion || "N/A"}</span>
             </div>
           </div>
           <div className="flex items-center justify-center gap-2.5">
             <div className="flex items-center gap-1">
-              <span className="text-[4.6px] font-extrabold uppercase" style={{ color: '#0f172a' }}>ስልክ / PHONE:</span>
+              <span className="text-[4.6px] font-black uppercase" style={{ color: '#b45309' }}>ስልክ / PHONE:</span>
               <span className="text-[7px] font-black" style={{ color: '#1e40af' }}>{data.phone || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4.6px] font-extrabold uppercase" style={{ color: '#0f172a' }}>የደም ዓይነት / BLOOD:</span>
-              <span className="text-[7px] font-black" style={{ color: '#b91c1c' }}>{data.blood_type || "N/A"}</span>
+              <span className="text-[4.6px] font-black uppercase" style={{ color: '#7c2d12' }}>የደም ዓይነት / BLOOD:</span>
+              <span className="text-[7px] font-black" style={{ color: '#dc2626' }}>{data.blood_type || "N/A"}</span>
             </div>
             <div className="flex items-center gap-1">
-              <span className="text-[4.6px] font-extrabold uppercase" style={{ color: '#0f172a' }}>የመለያ ቁጥር / BADGE:</span>
-              <span className="text-[7px] font-black" style={{ color: '#000000' }}>{data.badge_number || "N/A"}</span>
+              <span className="text-[4.6px] font-black uppercase" style={{ color: '#1d4ed8' }}>የመለያ ቁጥር / BADGE:</span>
+              <span className="text-[7px] font-black" style={{ color: '#7c2d12' }}>{data.badge_number || "N/A"}</span>
             </div>
           </div>
         </div>
 
-        {/* Bottom: QR on Left, Fayda Number Colorful Button + Signatures on Right */}
+        {/* Bottom: QR on Left, Fayda Number High-Contrast Pill + Signatures on Right */}
         <div className="flex-1 flex items-center justify-between gap-2 pt-1 min-h-0">
           {/* QR Code (Active ONLY after official approval) */}
           <div className="flex flex-col items-center justify-center h-full min-w-[19mm]">
@@ -1017,23 +1046,23 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
             </div>
           </div>
 
-          {/* Right Side: Fayda Number Button Badge + Signatures */}
+          {/* Right Side: Fayda Number High-Contrast Badge + Signatures */}
           <div className="flex-1 flex flex-col justify-between h-full">
-            {/* Fayda Number Button Badge */}
+            {/* Fayda Number Badge (Dark ink on luminous tint so it NEVER blanks out on any printer) */}
             <div className="flex justify-center pt-0.5">
               <div
                 className="inline-flex items-center gap-1.5 px-2.5 py-[1.8px] rounded-full shadow-sm"
                 style={{
-                  background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 55%, #047857 100%)',
-                  border: '1.2px solid #fbbf24'
+                  background: 'linear-gradient(135deg, #fefce8 0%, #eff6ff 55%, #ecfdf5 100%)',
+                  border: '1.2px solid #1d4ed8'
                 }}
               >
-                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#fbbf24' }} />
-                <span className="text-[5px] font-black uppercase tracking-wider" style={{ color: '#fde68a' }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: '#047857' }} />
+                <span className="text-[5px] font-black uppercase tracking-wider" style={{ color: '#1e3a8a' }}>
                   ፋይዳ ቁጥር / FAYDA:
                 </span>
-                <span className="text-[7px] font-black tracking-widest font-mono" style={{ color: '#ffffff' }}>
-                  {data.fayda_number || "N/A"}
+                <span className="text-[7px] font-black tracking-widest font-mono" style={{ color: '#991b1b' }}>
+                  {(data.fayda_number || '').trim() || "N/A"}
                 </span>
               </div>
             </div>
@@ -1054,7 +1083,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
                     <div className="w-full mb-1"></div>
                   )}
                 </div>
-                <div className="text-[4px] font-black uppercase text-center leading-none mt-0.5" style={{ color: '#000000' }}>
+                <div className="text-[4px] font-black uppercase text-center leading-none mt-0.5" style={{ color: '#1e3a8a' }}>
                   የአባሉ ፊርማ / Member's Signature
                 </div>
               </div>
@@ -1073,7 +1102,7 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
                     <div className="w-full mb-1"></div>
                   )}
                 </div>
-                <div className="text-[4px] font-black uppercase text-center leading-none mt-0.5" style={{ color: '#000000' }}>
+                <div className="text-[4px] font-black uppercase text-center leading-none mt-0.5" style={{ color: '#b45309' }}>
                   የኮሚሽነሩ ፊርማ / Commissioner Signature
                 </div>
               </div>
@@ -1499,31 +1528,53 @@ export function App() {
     return () => unsubscribe();
   }, []);
 
-  // Fetch & subscribe to system assets on mount so Login screen and all views get logos immediately
+  // Fetch & subscribe to system assets via individual document listeners (avoids unauthenticated collection list queries)
   useEffect(() => {
-    fetchAssets();
-    try {
-      const unsub = onSnapshot(collection(db, 'assets'), (snapshot) => {
-        const data: Record<string, string> = {};
-        snapshot.docs.forEach((docSnap) => {
-          const val = docSnap.data()?.value;
-          if (val) data[docSnap.id] = val;
-        });
-        setAssets((prev) => {
-          const next = { ...prev, ...data };
-          try {
-            localStorage.setItem('bgr_system_assets', JSON.stringify(next));
-          } catch {}
-          return next;
-        });
-      }, (err) => {
-        console.warn("Assets real-time listener notice:", err);
+    const assetKeys: (keyof Assets)[] = user
+      ? ['police_logo', 'bgr_flag', 'eth_flag', 'commissioner_signature']
+      : ['police_logo', 'bgr_flag', 'eth_flag'];
+
+    fetchAssets(Boolean(user));
+
+    const unsubs = assetKeys.map((key) => {
+      try {
+        return onSnapshot(
+          doc(db, 'assets', key),
+          (docSnap) => {
+            const val = docSnap.exists() ? docSnap.data()?.value : undefined;
+            setAssets((prev) => {
+              const next = { ...prev };
+              if (val) {
+                next[key] = val;
+              } else if (docSnap.exists() === false && prev[key]) {
+                delete next[key];
+              } else {
+                return prev;
+              }
+              try {
+                localStorage.setItem('bgr_system_assets', JSON.stringify(next));
+              } catch {}
+              return next;
+            });
+          },
+          (err) => {
+            console.warn(`Asset listener notice (${key}):`, err);
+          }
+        );
+      } catch (e) {
+        console.warn(`Asset listener init notice (${key}):`, e);
+        return () => {};
+      }
+    });
+
+    return () => {
+      unsubs.forEach((unsub) => {
+        try {
+          unsub();
+        } catch {}
       });
-      return () => unsub();
-    } catch (e) {
-      console.warn("Assets listener init notice:", e);
-    }
-  }, []);
+    };
+  }, [user?.id, user?.role]);
 
   const buildRecordsQuery = useCallback(() => {
     const idsRef = collection(db, 'ids');
@@ -1594,7 +1645,14 @@ export function App() {
 
   // Auto-save draft
   useEffect(() => {
-    if (formData.full_name_am || formData.full_name_en || formData.phone || formData.photo_url) {
+    if (
+      formData.full_name_am ||
+      formData.full_name_en ||
+      formData.phone ||
+      formData.fayda_number ||
+      formData.badge_number ||
+      formData.photo_url
+    ) {
       localStorage.setItem('id_form_draft', JSON.stringify(formData));
     } else {
       localStorage.removeItem('id_form_draft');
@@ -2310,10 +2368,26 @@ export function App() {
     }
   };
 
-  const fetchAssets = async () => {
+  const fetchAssets = async (includeProtected = Boolean(user)) => {
+    const keys: (keyof Assets)[] = includeProtected
+      ? ['police_logo', 'bgr_flag', 'eth_flag', 'commissioner_signature']
+      : ['police_logo', 'bgr_flag', 'eth_flag'];
     try {
-      const querySnapshot = await getDocs(collection(db, 'assets'));
-      const data = querySnapshot.docs.reduce((acc: any, docSnap) => ({ ...acc, [docSnap.id]: docSnap.data().value }), {});
+      const snaps = await Promise.all(
+        keys.map(async (key) => {
+          try {
+            const snap = await getDoc(doc(db, 'assets', key));
+            return [key, snap.exists() ? snap.data()?.value : undefined] as const;
+          } catch (err) {
+            console.warn(`Fetch asset notice (${key}):`, err);
+            return [key, undefined] as const;
+          }
+        })
+      );
+      const data: Partial<Assets> = {};
+      for (const [k, v] of snaps) {
+        if (v) data[k] = v;
+      }
       if (Object.keys(data).length > 0) {
         setAssets(prev => {
           const next = { ...prev, ...data };
@@ -2394,7 +2468,7 @@ export function App() {
     const reader = new FileReader();
     reader.onloadend = async () => {
       const base64 = await resizeImage(reader.result as string, 420, 520);
-      setFormData({ ...formData, photo_url: base64 });
+      setFormData((prev) => ({ ...prev, photo_url: base64 }));
     };
     reader.readAsDataURL(file);
   };
@@ -2735,7 +2809,7 @@ export function App() {
             <NavButton
               active={view === 'create'}
               onClick={() => {
-                const hasData = formData.full_name_am || formData.full_name_en || formData.phone || formData.photo_url;
+                const hasData = formData.full_name_am || formData.full_name_en || formData.phone || formData.fayda_number || formData.photo_url;
                 if (hasData && !formData.id && view !== 'create') {
                   if (confirm(t('ያልተቀመጠ መረጃ አለ። አዲስ መመዝገብ ይፈልጋሉ?', 'Unsaved form data found. Start a fresh ID form?'))) {
                     setFormData(emptyForm);
@@ -3144,7 +3218,7 @@ export function App() {
                       )}
                     </div>
                   </div>
-                  {(!formData.id && (formData.full_name_am || formData.full_name_en || formData.phone || formData.photo_url)) && (
+                  {(!formData.id && (formData.full_name_am || formData.full_name_en || formData.phone || formData.fayda_number || formData.photo_url)) && (
                     <button
                       type="button"
                       onClick={() => {
@@ -3181,68 +3255,68 @@ export function App() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-4">
-                      <FormInput label={t('ሙሉ ስም (በአማርኛ)', 'Full Name (Amharic)')} value={formData.full_name_am} onChange={(v) => setFormData({...formData, full_name_am: v})} placeholder={t('ሙሉ ስም በአማርኛ', 'Full name in Amharic')} icon={<User size={17}/>} />
-                      <FormInput label={t('ሙሉ ስም (በእንግሊዝኛ)', 'Full Name (English)')} value={formData.full_name_en} onChange={(v) => setFormData({...formData, full_name_en: v})} placeholder="Full Name" icon={<User size={17}/>} />
+                      <FormInput label={t('ሙሉ ስም (በአማርኛ)', 'Full Name (Amharic)')} value={formData.full_name_am} onChange={(v) => setFormData((prev) => ({...prev, full_name_am: v}))} placeholder={t('ሙሉ ስም በአማርኛ', 'Full name in Amharic')} icon={<User size={17}/>} />
+                      <FormInput label={t('ሙሉ ስም (በእንግሊዝኛ)', 'Full Name (English)')} value={formData.full_name_en} onChange={(v) => setFormData((prev) => ({...prev, full_name_en: v}))} placeholder="Full Name" icon={<User size={17}/>} />
                       <div className="grid grid-cols-2 gap-3">
-                        <FormInput label={t('ማዕረግ (አማርኛ)', 'Rank (Amharic)')} value={formData.rank_am} onChange={(v) => setFormData({...formData, rank_am: v})} placeholder={t('ማዕረግ', 'Rank AM')} icon={<Award size={17}/>} />
-                        <FormInput label={t('ማዕረግ (እንግሊዝኛ)', 'Rank (English)')} value={formData.rank_en} onChange={(v) => setFormData({...formData, rank_en: v})} placeholder="Rank" icon={<Award size={17}/>} />
+                        <FormInput label={t('ማዕረግ (አማርኛ)', 'Rank (Amharic)')} value={formData.rank_am} onChange={(v) => setFormData((prev) => ({...prev, rank_am: v}))} placeholder={t('ማዕረግ', 'Rank AM')} icon={<Award size={17}/>} />
+                        <FormInput label={t('ማዕረግ (እንግሊዝኛ)', 'Rank (English)')} value={formData.rank_en} onChange={(v) => setFormData((prev) => ({...prev, rank_en: v}))} placeholder="Rank" icon={<Award size={17}/>} />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
-                        <FormInput label={t('ኃላፊነት (አማርኛ)', 'Responsibility (AM)')} value={formData.responsibility_am} onChange={(v) => setFormData({...formData, responsibility_am: v})} placeholder={t('ኃላፊነት', 'Role AM')} icon={<Briefcase size={17}/>} />
-                        <FormInput label={t('ኃላፊነት (እንግሊዝኛ)', 'Responsibility (EN)')} value={formData.responsibility_en} onChange={(v) => setFormData({...formData, responsibility_en: v})} placeholder="Responsibility" icon={<Briefcase size={17}/>} />
+                        <FormInput label={t('ኃላፊነት (አማርኛ)', 'Responsibility (AM)')} value={formData.responsibility_am} onChange={(v) => setFormData((prev) => ({...prev, responsibility_am: v}))} placeholder={t('ኃላፊነት', 'Role AM')} icon={<Briefcase size={17}/>} />
+                        <FormInput label={t('ኃላፊነት (እንግሊዝኛ)', 'Responsibility (EN)')} value={formData.responsibility_en} onChange={(v) => setFormData((prev) => ({...prev, responsibility_en: v}))} placeholder="Responsibility" icon={<Briefcase size={17}/>} />
                       </div>
-                      <FormInput label={t('ስልክ ቁጥር', 'Phone Number')} value={formData.phone} onChange={(v) => setFormData({...formData, phone: v})} placeholder="+251..." icon={<Phone size={17}/>} />
-                      <FormInput label={t('የፋይዳ ቁጥር (FIN)', 'Fayda Number (FIN)')} value={formData.fayda_number} onChange={(v) => setFormData({...formData, fayda_number: v})} placeholder={t('የፋይዳ መለያ ቁጥር ያስገቡ', 'Enter Fayda FIN number')} icon={<CreditCard size={17}/>} />
+                      <FormInput label={t('ስልክ ቁጥር', 'Phone Number')} value={formData.phone} onChange={(v) => setFormData((prev) => ({...prev, phone: v}))} placeholder="+251..." icon={<Phone size={17}/>} />
+                      <FormInput label={t('የፋይዳ ቁጥር (FIN)', 'Fayda Number (FIN)')} value={formData.fayda_number} onChange={(v) => setFormData((prev) => ({...prev, fayda_number: v}))} placeholder={t('የፋይዳ መለያ ቁጥር ያስገቡ', 'Enter Fayda FIN number')} icon={<CreditCard size={17}/>} />
 
                       <div className="pt-4 border-t border-slate-200">
-                        <h4 className="text-xs font-bold text-[#0B1B3A] uppercase tracking-wider mb-3">
+                        <h4 className="text-xs font-extrabold text-[#B45309] uppercase tracking-wider mb-3">
                           {t('የፊት ለፊት መረጃዎች እና ቀናት', 'Front Card Details & Validity Dates')}
                         </h4>
                         <div className="grid grid-cols-2 gap-3">
-                          <FormInput label={t('የደም ዓይነት', 'Blood Type')} value={formData.blood_type} onChange={(v) => setFormData({...formData, blood_type: v})} placeholder="A+, B-, O+" icon={<Check size={17}/>} />
-                          <FormInput label={t('የመለያ ቁጥር (Badge)', 'Badge Number')} value={formData.badge_number} onChange={(v) => setFormData({...formData, badge_number: v})} placeholder={t('መለያ ቁጥር', 'Badge No.')} icon={<Shield size={17}/>} />
+                          <FormInput label={t('የደም ዓይነት', 'Blood Type')} value={formData.blood_type} onChange={(v) => setFormData((prev) => ({...prev, blood_type: v}))} placeholder="A+, B-, O+" icon={<Check size={17}/>} />
+                          <FormInput label={t('የመለያ ቁጥር (Badge)', 'Badge Number')} value={formData.badge_number} onChange={(v) => setFormData((prev) => ({...prev, badge_number: v}))} placeholder={t('መለያ ቁጥር', 'Badge No.')} icon={<Shield size={17}/>} />
                         </div>
                         <div className="grid grid-cols-2 gap-3 mt-3">
                           <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-600 ml-0.5">{t('የተሰጠበት ቀን', 'Issued Date')}</label>
+                            <label className="text-xs font-extrabold text-[#1E3A8A] ml-0.5">{t('የተሰጠበት ቀን', 'Issued Date')}</label>
                             <input
                               type="date"
                               value={formData.issued_at}
-                              onChange={(e) => setFormData({...formData, issued_at: e.target.value})}
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-[#1E40AF] focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-medium tabular-nums"
+                              onChange={(e) => setFormData((prev) => ({...prev, issued_at: e.target.value}))}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-[#065F46] font-bold focus:bg-white focus:border-[#047857] focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all tabular-nums"
                             />
                           </div>
                           <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-600 ml-0.5">{t('የሚያበቃበት ቀን', 'Expiry Date')}</label>
+                            <label className="text-xs font-extrabold text-[#9F1239] ml-0.5">{t('የሚያበቃበት ቀን', 'Expiry Date')}</label>
                             <input
                               type="date"
                               value={formData.expires_at}
-                              onChange={(e) => setFormData({...formData, expires_at: e.target.value})}
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-[#1E40AF] focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-medium tabular-nums"
+                              onChange={(e) => setFormData((prev) => ({...prev, expires_at: e.target.value}))}
+                              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-[#B91C1C] font-bold focus:bg-white focus:border-[#DC2626] focus:ring-2 focus:ring-red-500/20 outline-none transition-all tabular-nums"
                             />
                           </div>
                         </div>
                       </div>
 
                       <div className="pt-4 border-t border-slate-200">
-                        <h4 className="text-xs font-bold text-[#0B1B3A] uppercase tracking-wider mb-3">
+                        <h4 className="text-xs font-extrabold text-[#B45309] uppercase tracking-wider mb-3">
                           {t('የጀርባ ገጽ መረጃዎች', 'Back Card Physical & Emergency Info')}
                         </h4>
                         <div className="grid grid-cols-3 gap-3">
-                          <FormInput label={t('ጾታ', 'Gender')} value={formData.gender} onChange={(v) => setFormData({...formData, gender: v})} placeholder={t('ወ / ሴ', 'M / F')} icon={<User size={16}/>} />
-                          <FormInput label={t('መልክ', 'Complexion')} value={formData.complexion} onChange={(v) => setFormData({...formData, complexion: v})} placeholder={t('ጠይም...', 'Complexion')} icon={<Eye size={16}/>} />
-                          <FormInput label={t('ቁመት', 'Height')} value={formData.height} onChange={(v) => setFormData({...formData, height: v})} placeholder="1.75m" icon={<Plus size={16}/>} />
+                          <FormInput label={t('ጾታ', 'Gender')} value={formData.gender} onChange={(v) => setFormData((prev) => ({...prev, gender: v}))} placeholder={t('ወ / ሴ', 'M / F')} icon={<User size={16}/>} />
+                          <FormInput label={t('መልክ', 'Complexion')} value={formData.complexion} onChange={(v) => setFormData((prev) => ({...prev, complexion: v}))} placeholder={t('ጠይም...', 'Complexion')} icon={<Eye size={16}/>} />
+                          <FormInput label={t('ቁመት', 'Height')} value={formData.height} onChange={(v) => setFormData((prev) => ({...prev, height: v}))} placeholder="1.75m" icon={<Plus size={16}/>} />
                         </div>
                         <div className="grid grid-cols-2 gap-3 mt-3">
-                          <FormInput label={t('የአደጋ ጊዜ ተጠሪ ስም', 'Emergency Contact')} value={formData.emergency_contact_name} onChange={(v) => setFormData({...formData, emergency_contact_name: v})} placeholder={t('ስም', 'Contact Name')} icon={<User size={16}/>} />
-                          <FormInput label={t('የአደጋ ጊዜ ተጠሪ ስልክ', 'Emergency Phone')} value={formData.emergency_contact_phone} onChange={(v) => setFormData({...formData, emergency_contact_phone: v})} placeholder="+251..." icon={<Phone size={16}/>} />
+                          <FormInput label={t('የአደጋ ጊዜ ተጠሪ ስም', 'Emergency Contact')} value={formData.emergency_contact_name} onChange={(v) => setFormData((prev) => ({...prev, emergency_contact_name: v}))} placeholder={t('ስም', 'Contact Name')} icon={<User size={16}/>} />
+                          <FormInput label={t('የአደጋ ጊዜ ተጠሪ ስልክ', 'Emergency Phone')} value={formData.emergency_contact_phone} onChange={(v) => setFormData((prev) => ({...prev, emergency_contact_phone: v}))} placeholder="+251..." icon={<Phone size={16}/>} />
                         </div>
                       </div>
                     </div>
 
                     <div className="flex flex-col gap-5">
                       <div className="flex flex-col items-center justify-center p-5 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
-                        <p className="text-xs font-bold text-slate-600 mb-3">{t('የአባሉ ፎቶ (Member Photo)', 'Member Photo')}</p>
+                        <p className="text-xs font-extrabold text-[#1E3A8A] mb-3">{t('የአባሉ ፎቶ (Member Photo)', 'Member Photo')}</p>
                         <div className="w-40 h-52 bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200 relative group">
                           {formData.photo_url ? (
                             <img src={formData.photo_url} className="w-full h-full object-cover" alt="Preview" />
@@ -3262,7 +3336,7 @@ export function App() {
                       </div>
 
                       <div className="flex flex-col items-center justify-center p-5 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
-                        <p className="text-xs font-bold text-slate-600 mb-3">{t('የአባሉ ፊርማ', "Member's Signature")}</p>
+                        <p className="text-xs font-extrabold text-[#1E3A8A] mb-3">{t('የአባሉ ፊርማ', "Member's Signature")}</p>
                         <div className="w-full h-24 bg-white rounded-xl shadow-xs overflow-hidden border border-slate-200 relative group flex items-center justify-center">
                           {formData.member_signature ? (
                             <img src={formData.member_signature} className="h-full object-contain" alt="Member Signature Preview" />
@@ -3282,7 +3356,7 @@ export function App() {
                               const reader = new FileReader();
                               reader.onloadend = async () => {
                                 const base64 = await resizeImage(reader.result as string, 400, 200);
-                                setFormData({ ...formData, member_signature: base64 });
+                                setFormData((prev) => ({ ...prev, member_signature: base64 }));
                               };
                               reader.readAsDataURL(file);
                             }}
@@ -3291,7 +3365,7 @@ export function App() {
                       </div>
 
                       <div className="flex flex-col items-center justify-center p-5 bg-slate-50 rounded-2xl border border-dashed border-slate-300">
-                        <p className="text-xs font-bold text-slate-600 mb-3">{t('የኮሚሽነሩ ፊርማ', 'Commissioner Signature')}</p>
+                        <p className="text-xs font-extrabold text-[#B45309] mb-3">{t('የኮሚሽነሩ ፊርማ', 'Commissioner Signature')}</p>
                         <div className="w-full h-24 bg-white rounded-xl shadow-xs overflow-hidden border border-slate-200 relative group flex items-center justify-center">
                           {formData.commissioner_signature ? (
                             <img src={formData.commissioner_signature} className="h-full object-contain" alt="Signature Preview" />
@@ -3311,7 +3385,7 @@ export function App() {
                               const reader = new FileReader();
                               reader.onloadend = async () => {
                                 const base64 = await resizeImage(reader.result as string, 400, 200);
-                                setFormData({ ...formData, commissioner_signature: base64 });
+                                setFormData((prev) => ({ ...prev, commissioner_signature: base64 }));
                               };
                               reader.readAsDataURL(file);
                             }}
@@ -4537,9 +4611,9 @@ function AssetUpload({
 function FormInput({ label, value, onChange, placeholder, icon }: { label: string, value: string, onChange: (v: string) => void, placeholder: string, icon: React.ReactNode }) {
   return (
     <div className="space-y-1.5">
-      <label className="text-xs font-bold text-slate-600 ml-0.5">{label}</label>
+      <label className="text-xs font-extrabold text-[#1E3A8A] ml-0.5 tracking-[0.01em]">{label}</label>
       <div className="relative">
-        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#B45309]">
           {icon}
         </div>
         <input
@@ -4547,7 +4621,7 @@ function FormInput({ label, value, onChange, placeholder, icon }: { label: strin
           value={value || ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:bg-white focus:border-[#1E40AF] focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+          className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-[#065F46] placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-[#047857] focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
         />
       </div>
     </div>
@@ -5344,9 +5418,22 @@ function VerificationView({
           setVerifyState('not_found');
         }
 
-        if (Object.keys(assets).length === 0) {
-          const assetsSnapshot = await getDocs(collection(db, 'assets'));
-          const assetsData = assetsSnapshot.docs.reduce((acc: any, d) => ({ ...acc, [d.id]: d.data().value }), {});
+        if (!assets.police_logo || !assets.bgr_flag || !assets.eth_flag) {
+          const publicKeys: (keyof Assets)[] = ['police_logo', 'bgr_flag', 'eth_flag'];
+          const snaps = await Promise.all(
+            publicKeys.map(async (k) => {
+              try {
+                const s = await getDoc(doc(db, 'assets', k));
+                return [k, s.exists() ? s.data()?.value : undefined] as const;
+              } catch {
+                return [k, undefined] as const;
+              }
+            })
+          );
+          const assetsData: Assets = { ...assets };
+          for (const [k, v] of snaps) {
+            if (v) assetsData[k] = v;
+          }
           setAssets(assetsData);
         }
       } catch (err) {

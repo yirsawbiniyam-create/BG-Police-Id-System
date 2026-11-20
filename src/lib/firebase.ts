@@ -16,10 +16,11 @@ const dbId = (firebaseConfig as any).firestoreDatabaseId || "(default)";
 
 let firestoreDb: Firestore;
 try {
-  // Enable IndexedDB persistent offline cache so ID issuance, search, and UI never stall on slow internet
+  // Enable IndexedDB persistent offline cache & force long-polling so ID issuance, search, and UI never stall or drop Listen streams behind HTTP/2 proxies
   firestoreDb = initializeFirestore(
     app,
     {
+      experimentalForceLongPolling: true,
       localCache: persistentLocalCache({
         tabManager: persistentMultipleTabManager()
       })
