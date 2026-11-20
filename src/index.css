@@ -122,7 +122,8 @@
     background: #ffffff !important;
   }
 
-  .no-print {
+  .no-print,
+  .verify-readonly-block {
     display: none !important;
   }
 

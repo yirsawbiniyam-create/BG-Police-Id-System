@@ -107,33 +107,40 @@ service cloud.firestore {
         );
     }
 
-    function isValidIdRecord(data) {
+    function allowedIdKeys() {
+      return [
+        'id_number', 'full_name_am', 'full_name_en', 'rank_am', 'rank_en',
+        'responsibility_am', 'responsibility_en', 'phone', 'photo_url',
+        'blood_type', 'badge_number', 'fayda_number', 'gender', 'complexion',
+        'height', 'emergency_contact_name', 'emergency_contact_phone',
+        'commissioner_signature', 'member_signature', 'issued_at', 'expires_at',
+        'created_at', 'updated_at', 'deleted', 'deleted_at', 'status',
+        'is_registered', 'approved_by', 'approved_at', 'correction_note',
+        'reviewed_by', 'reviewed_at', 'resubmitted', 'resubmitted_at',
+        'created_by_email'
+      ];
+    }
+
+    function isValidIdRecordFields(data) {
       return data.keys().hasAll(['id_number', 'status']) &&
-        data.keys().hasOnly([
-          'id_number', 'full_name_am', 'full_name_en', 'rank_am', 'rank_en',
-          'responsibility_am', 'responsibility_en', 'phone', 'photo_url',
-          'blood_type', 'badge_number', 'fayda_number', 'gender', 'complexion',
-          'height', 'emergency_contact_name', 'emergency_contact_phone',
-          'commissioner_signature', 'member_signature', 'issued_at', 'expires_at',
-          'created_at', 'updated_at', 'deleted', 'deleted_at', 'status',
-          'is_registered', 'approved_by', 'approved_at', 'correction_note',
-          'reviewed_by', 'reviewed_at', 'resubmitted', 'resubmitted_at',
-          'created_by_email'
-        ]) &&
         data.id_number is string && data.id_number.size() > 0 && data.id_number.size() <= 64 &&
         data.status in ['pending', 'needs_correction', 'approved', 'rejected'] &&
-        data.get('full_name_am', '') is string && data.get('full_name_am', '').size() <= 200 &&
-        data.get('full_name_en', '') is string && data.get('full_name_en', '').size() <= 200 &&
-        data.get('rank_am', '') is string && data.get('rank_am', '').size() <= 140 &&
-        data.get('rank_en', '') is string && data.get('rank_en', '').size() <= 140 &&
-        data.get('responsibility_am', '') is string && data.get('responsibility_am', '').size() <= 200 &&
-        data.get('responsibility_en', '') is string && data.get('responsibility_en', '').size() <= 200 &&
-        data.get('phone', '') is string && data.get('phone', '').size() <= 40 &&
-        data.get('fayda_number', '') is string && data.get('fayda_number', '').size() <= 64 &&
-        data.get('badge_number', '') is string && data.get('badge_number', '').size() <= 64 &&
-        data.get('photo_url', '') is string && data.get('photo_url', '').size() <= 1000000 &&
-        data.get('commissioner_signature', '') is string && data.get('commissioner_signature', '').size() <= 600000 &&
-        data.get('member_signature', '') is string && data.get('member_signature', '').size() <= 600000;
+        (!('full_name_am' in data) || data.full_name_am == null || (data.full_name_am is string && data.full_name_am.size() <= 200)) &&
+        (!('full_name_en' in data) || data.full_name_en == null || (data.full_name_en is string && data.full_name_en.size() <= 200)) &&
+        (!('rank_am' in data) || data.rank_am == null || (data.rank_am is string && data.rank_am.size() <= 140)) &&
+        (!('rank_en' in data) || data.rank_en == null || (data.rank_en is string && data.rank_en.size() <= 140)) &&
+        (!('responsibility_am' in data) || data.responsibility_am == null || (data.responsibility_am is string && data.responsibility_am.size() <= 200)) &&
+        (!('responsibility_en' in data) || data.responsibility_en == null || (data.responsibility_en is string && data.responsibility_en.size() <= 200)) &&
+        (!('phone' in data) || data.phone == null || (data.phone is string && data.phone.size() <= 40)) &&
+        (!('fayda_number' in data) || data.fayda_number == null || (data.fayda_number is string && data.fayda_number.size() <= 64)) &&
+        (!('badge_number' in data) || data.badge_number == null || (data.badge_number is string && data.badge_number.size() <= 64)) &&
+        (!('photo_url' in data) || data.photo_url == null || (data.photo_url is string && data.photo_url.size() <= 1000000)) &&
+        (!('commissioner_signature' in data) || data.commissioner_signature == null || (data.commissioner_signature is string && data.commissioner_signature.size() <= 600000)) &&
+        (!('member_signature' in data) || data.member_signature == null || (data.member_signature is string && data.member_signature.size() <= 600000));
+    }
+
+    function isValidIdRecord(data) {
+      return data.keys().hasOnly(allowedIdKeys()) && isValidIdRecordFields(data);
     }
 
     function isValidUserRecord(data) {
@@ -188,7 +195,10 @@ service cloud.firestore {
           incoming().get('deleted', false) == false
         )
       );
-      allow update: if isSignedIn() && isValidId(id) && isValidIdRecord(incoming()) && (
+      allow update: if isSignedIn() && isValidId(id) && isValidIdRecordFields(incoming()) && (
+        isValidIdRecord(incoming()) ||
+        incoming().diff(existing()).affectedKeys().hasOnly(allowedIdKeys())
+      ) && (
         isAdmin() ||
         isApprover() || (
           isDataEntry() &&

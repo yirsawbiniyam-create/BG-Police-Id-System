@@ -97,11 +97,18 @@ interface Assets {
 // --- Security & Optimization Helpers ---
 
 const sanitizeText = (val: unknown, maxLen = 200): string => {
+  if (typeof val === 'number') return String(val).trim().slice(0, maxLen);
   if (typeof val !== 'string') return '';
   return val
     .replace(/[\u0000-\u001F\u007F<>]/g, '')
     .trim()
     .slice(0, maxLen);
+};
+
+const getFaydaValue = (data: any): string => {
+  if (!data || typeof data !== 'object') return '';
+  const raw = data.fayda_number ?? data.fayda ?? data.fin ?? data.faydaNumber ?? '';
+  return sanitizeText(raw, 60);
 };
 
 const hashPassword = async (password: string): Promise<string> => {
@@ -194,7 +201,7 @@ const raceWithTimeout = <T,>(promise: Promise<T>, ms: number, fallbackValue: T):
 
 const resizeImage = (base64Str: string, maxWidth = 800, maxHeight = 800, preservePng = false): Promise<string> => {
   return new Promise((resolve) => {
-    const isPng = base64Str.startsWith('data:image/png') || preservePng;
+    const isPng = preservePng;
     const img = new Image();
     img.src = base64Str;
     img.onload = () => {
@@ -218,6 +225,10 @@ const resizeImage = (base64Str: string, maxWidth = 800, maxHeight = 800, preserv
       canvas.height = Math.round(height);
       const ctx = canvas.getContext('2d');
       if (ctx) {
+        if (!isPng) {
+          ctx.fillStyle = '#ffffff';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+        }
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(img, 0, 0, Math.round(width), Math.round(height));
@@ -225,7 +236,7 @@ const resizeImage = (base64Str: string, maxWidth = 800, maxHeight = 800, preserv
       if (isPng) {
         resolve(canvas.toDataURL('image/png'));
       } else {
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/jpeg', 0.84));
       }
     };
     img.onerror = () => resolve(base64Str);
@@ -399,7 +410,7 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
           return;
         }
 
-        // Normalize onto exact portrait canvas (312x392) anchored at top so head/crown never clip
+        // Preserve normal passport/bust portrait ("ጉርድ ፎቶ") intact without slicing head or shoulders
         const w = 312;
         const h = 392;
         const targetRatio = w / h;
@@ -429,7 +440,7 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
         const data = imageData.data;
         const total = w * h;
 
-        // 1. Precompute luminance & Sobel-style edge gradient to protect crisp hair/uniform borders
+        // 1. Gently brighten clear uniform top/side studio backdrop toward white WITHOUT cutting or deleting the person
         const lum = new Float32Array(total);
         for (let i = 0; i < total; i++) {
           const p = i * 4;
@@ -439,251 +450,116 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
         for (let y = 1; y < h - 1; y++) {
           for (let x = 1; x < w - 1; x++) {
             const idx = y * w + x;
-            const gx = lum[idx + 1] - lum[idx - 1];
-            const gy = lum[idx + w] - lum[idx - w];
-            edgeMag[idx] = Math.abs(gx) + Math.abs(gy);
+            edgeMag[idx] = Math.abs(lum[idx + 1] - lum[idx - 1]) + Math.abs(lum[idx + w] - lum[idx - w]);
           }
         }
 
-        // 2. Build multi-cluster backdrop palette from upper corners & side perimeter (away from shoulders/center crown)
-        const clusters: { r: number; g: number; b: number; count: number }[] = [];
-        const addSample = (x: number, y: number) => {
-          const p = (y * w + x) * 4;
-          if (data[p + 3] < 200) return;
-          const r = data[p], g = data[p + 1], b = data[p + 2];
-          for (let c = 0; c < clusters.length; c++) {
-            const cl = clusters[c];
-            if (Math.hypot(r - cl.r, g - cl.g, b - cl.b) <= 32) {
-              const n = cl.count + 1;
-              cl.r = (cl.r * cl.count + r) / n;
-              cl.g = (cl.g * cl.count + g) / n;
-              cl.b = (cl.b * cl.count + b) / n;
-              cl.count = n;
-              return;
-            }
-          }
-          if (clusters.length < 6) {
-            clusters.push({ r, g, b, count: 1 });
-          }
-        };
-
+        let sumR = 0, sumG = 0, sumB = 0, cnt = 0;
+        let minR = 255, maxR = 0, minG = 255, maxG = 0, minB = 255, maxB = 0;
         for (let y = 0; y < 8; y++) {
-          for (let x = 0; x < w; x++) {
-            // Skip center top edge where dark hair can touch top border
-            if (x > w * 0.34 && x < w * 0.66) continue;
-            addSample(x, y);
-          }
-        }
-        const sideSampleMaxY = Math.floor(h * 0.62);
-        for (let y = 8; y < sideSampleMaxY; y += 2) {
-          for (let dx = 0; dx < 7; dx++) {
-            addSample(dx, y);
-            addSample(w - 1 - dx, y);
-          }
-        }
-
-        const nonSkinClusters = clusters.filter(
-          (cl) => !(cl.r > 85 && cl.g > 48 && cl.r > cl.g && cl.r - cl.b > 32)
-        );
-        const bgPalette = (nonSkinClusters.length > 0 ? nonSkinClusters : clusters)
-          .sort((a, b) => b.count - a.count)
-          .slice(0, 4);
-
-        const isSkinPixel = (x: number, y: number, r: number, g: number, b: number) => {
-          const fx = (x / w - 0.5) / 0.25;
-          const fy = (y / h - 0.36) / 0.26;
-          if (fx * fx + fy * fy > 1) return false;
-          const minC = Math.min(r, g, b);
-          return r > 75 && g > 42 && b > 20 && r > g && r > b && (r - minC) > 16;
-        };
-
-        const minClusterDistance = (r: number, g: number, b: number) => {
-          if (bgPalette.length === 0) return 999;
-          let best = 999;
-          for (let i = 0; i < bgPalette.length; i++) {
-            const cl = bgPalette[i];
-            const d = Math.hypot(r - cl.r, g - cl.g, b - cl.b);
-            if (d < best) best = d;
-          }
-          return best;
-        };
-
-        // 3. Edge-aware flood-fill from top, left/right borders, and lower corners
-        const visited = new Uint8Array(total);
-        const queue = new Int32Array(total);
-        let head = 0;
-        let tail = 0;
-
-        const isBackdropPixel = (x: number, y: number, idx: number, parentIdx: number) => {
-          const p = idx * 4;
-          const a = data[p + 3];
-          if (a < 30) return true;
-          const r = data[p], g = data[p + 1], b = data[p + 2];
-          if (isSkinPixel(x, y, r, g, b)) return false;
-
-          const dist = minClusterDistance(r, g, b);
-          const maxC = Math.max(r, g, b);
-          const minC = Math.min(r, g, b);
-
-          // Near-white or bright neutral backdrop (guard white shirt at bottom center)
-          if (minC >= 186 && (maxC - minC) <= 44) {
-            if (y < h * 0.68 || x < w * 0.24 || x > w * 0.76 || dist <= 65 || edgeMag[idx] < 44) {
-              return true;
+          for (let x = 0; x < 10; x++) {
+            for (const cx of [x, w - 1 - x]) {
+              const p = (y * w + cx) * 4;
+              if (data[p + 3] > 200) {
+                const r = data[p], g = data[p + 1], b = data[p + 2];
+                sumR += r; sumG += g; sumB += b; cnt++;
+                if (r < minR) minR = r; if (r > maxR) maxR = r;
+                if (g < minG) minG = g; if (g > maxG) maxG = g;
+                if (b < minB) minB = b; if (b > maxB) maxB = b;
+              }
             }
           }
-
-          // Strong color match to studio/wall perimeter clusters
-          if (dist <= 44) {
-            return true;
-          }
-
-          // Smooth gradient backdrop continuity without crossing sharp hair/uniform edges
-          if (parentIdx >= 0 && dist <= 78 && edgeMag[idx] < 46) {
-            const pp = parentIdx * 4;
-            const localDiff = Math.hypot(r - data[pp], g - data[pp + 1], b - data[pp + 2]);
-            if (localDiff <= 22) return true;
-          }
-
-          return false;
-        };
-
-        const enqueueIfBackdrop = (x: number, y: number, parentIdx: number) => {
-          const idx = y * w + x;
-          if (!visited[idx] && isBackdropPixel(x, y, idx, parentIdx)) {
-            visited[idx] = 1;
-            queue[tail++] = idx;
-          }
-        };
-
-        for (let x = 0; x < w; x++) {
-          enqueueIfBackdrop(x, 0, -1);
         }
-        const sideLimitY = Math.round(h * 0.90);
-        for (let y = 1; y < sideLimitY; y++) {
-          enqueueIfBackdrop(0, y, -1);
-          enqueueIfBackdrop(w - 1, y, -1);
-        }
-        for (let x = 0; x < Math.round(w * 0.14); x++) {
-          enqueueIfBackdrop(x, h - 1, -1);
-          enqueueIfBackdrop(w - 1 - x, h - 1, -1);
-        }
+        const bgR = cnt > 0 ? sumR / cnt : 255;
+        const bgG = cnt > 0 ? sumG / cnt : 255;
+        const bgB = cnt > 0 ? sumB / cnt : 255;
+        const bgSpread = Math.max(maxR - minR, maxG - minG, maxB - minB);
+        const bgLum = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
+        const looksLikeSkin = (bgR - bgB > 28) && bgG < 200;
+        const hasUniformBackdrop = cnt > 0 && bgSpread <= 38 && bgLum >= 105 && !looksLikeSkin;
 
-        while (head < tail) {
-          const idx = queue[head++];
-          const p = idx * 4;
-          data[p + 3] = 0;
-          const x = idx % w;
-          const y = (idx - x) / w;
-          if (x > 0) enqueueIfBackdrop(x - 1, y, idx);
-          if (x < w - 1) enqueueIfBackdrop(x + 1, y, idx);
-          if (y > 0) enqueueIfBackdrop(x, y - 1, idx);
-          if (y < h - 1) enqueueIfBackdrop(x, y + 1, idx);
-        }
+        if (hasUniformBackdrop) {
+          const visited = new Uint8Array(total);
+          const queue = new Int32Array(total);
+          let head = 0, tail = 0;
 
-        // 4. Feather anti-aliased fringe & decontaminate studio halo toward soft white
-        const edgeBand1 = new Uint8Array(total);
-        for (let y = 1; y < h - 1; y++) {
-          for (let x = 1; x < w - 1; x++) {
+          const isBackdrop = (x: number, y: number, idx: number) => {
+            const p = idx * 4;
+            if (data[p + 3] < 40) return true;
+            const r = data[p], g = data[p + 1], b = data[p + 2];
+            // Protect face & central torso region so nothing in the portrait is ever altered
+            const fx = (x / w - 0.5) / 0.29;
+            const fy = (y / h - 0.44) / 0.34;
+            if (fx * fx + fy * fy <= 1) return false;
+            const dist = Math.hypot(r - bgR, g - bgG, b - bgB);
+            return dist <= 32 && edgeMag[idx] < 38;
+          };
+
+          const enqueue = (x: number, y: number) => {
             const idx = y * w + x;
-            if (visited[idx]) continue;
-            const clearedNeighbors =
-              (visited[idx - 1] ? 1 : 0) +
-              (visited[idx + 1] ? 1 : 0) +
-              (visited[idx - w] ? 1 : 0) +
-              (visited[idx + w] ? 1 : 0);
-            if (clearedNeighbors > 0) {
-              edgeBand1[idx] = 1;
-              const p = idx * 4;
-              const factor = clearedNeighbors >= 2 ? 0.22 : 0.48;
-              data[p + 3] = Math.round(data[p + 3] * factor);
-              // Decontaminate blue/gray background tint toward white
-              data[p] = Math.min(255, Math.round(data[p] * 0.65 + 255 * 0.35));
-              data[p + 1] = Math.min(255, Math.round(data[p + 1] * 0.65 + 255 * 0.35));
-              data[p + 2] = Math.min(255, Math.round(data[p + 2] * 0.65 + 255 * 0.35));
+            if (!visited[idx] && isBackdrop(x, y, idx)) {
+              visited[idx] = 1;
+              queue[tail++] = idx;
             }
+          };
+
+          for (let x = 0; x < w; x++) enqueue(x, 0);
+          for (let y = 1; y < Math.round(h * 0.72); y++) {
+            enqueue(0, y);
+            enqueue(w - 1, y);
           }
-        }
-        for (let y = 1; y < h - 1; y++) {
-          for (let x = 1; x < w - 1; x++) {
-            const idx = y * w + x;
-            if (visited[idx] || edgeBand1[idx]) continue;
-            if (edgeBand1[idx - 1] || edgeBand1[idx + 1] || edgeBand1[idx - w] || edgeBand1[idx + w]) {
-              const p = idx * 4;
-              data[p + 3] = Math.round(data[p + 3] * 0.8);
-            }
+
+          while (head < tail) {
+            const idx = queue[head++];
+            const p = idx * 4;
+            // Shift studio background smoothly toward white instead of carving hard holes
+            data[p] = Math.round(data[p] * 0.16 + 255 * 0.84);
+            data[p + 1] = Math.round(data[p + 1] * 0.16 + 255 * 0.84);
+            data[p + 2] = Math.round(data[p + 2] * 0.16 + 255 * 0.84);
+            const x = idx % w;
+            const y = (idx - x) / w;
+            if (x > 0) enqueue(x - 1, y);
+            if (x < w - 1) enqueue(x + 1, y);
+            if (y > 0) enqueue(x, y - 1);
+            if (y < h - 1) enqueue(x, y + 1);
           }
         }
 
-        // 5. Smooth organic bust/oval dissolve so ZERO rectangular corners or borders can ever remain
+        // 2. Keep the FULL rectangular portrait completely intact (no circle/oval crop!),
+        // softly feathering ONLY the outermost 5-7% perimeter edges so it blends cleanly into the ID card background
         const smooth = (t: number) => {
           const c = Math.max(0, Math.min(1, t));
           return c * c * (3 - 2 * c);
         };
+
+        const featherX = Math.max(12, Math.round(w * 0.065));
+        const featherTop = Math.max(10, Math.round(h * 0.045));
+        const featherBottom = Math.max(14, Math.round(h * 0.075));
+
         for (let y = 0; y < h; y++) {
-          const ny = y / h;
-          const rx = ny < 0.48 ? 0.415 : 0.415 + (ny - 0.48) * 0.21;
-          const ry = 0.475;
-          const bottomFade = ny > 0.80 ? smooth((0.99 - ny) / 0.19) : 1;
-          const topFade = ny < 0.04 ? smooth(ny / 0.04) : 1;
+          const fyTop = y < featherTop ? smooth(y / featherTop) : 1;
+          const fyBot = y > h - 1 - featherBottom ? smooth((h - 1 - y) / featherBottom) : 1;
+          const fy = fyTop * fyBot;
           for (let x = 0; x < w; x++) {
             const idx = y * w + x;
             const p = idx * 4;
             if (data[p + 3] === 0) continue;
-            const nx = x / w;
-            const er = Math.hypot((nx - 0.5) / rx, (ny - 0.44) / ry);
-            const ovalFade = er <= 0.78 ? 1 : smooth((1.0 - er) / 0.22);
-            const mask = ovalFade * bottomFade * topFade;
-            if (mask < 1) {
-              data[p + 3] = Math.round(data[p + 3] * mask);
+            const fxLeft = x < featherX ? smooth(x / featherX) : 1;
+            const fxRight = x > w - 1 - featherX ? smooth((w - 1 - x) / featherX) : 1;
+            const edgeKeep = fy * fxLeft * fxRight;
+            if (edgeKeep < 1) {
+              const whiteMix = (1 - edgeKeep) * 0.45;
+              data[p] = Math.round(data[p] * (1 - whiteMix) + 255 * whiteMix);
+              data[p + 1] = Math.round(data[p + 1] * (1 - whiteMix) + 255 * whiteMix);
+              data[p + 2] = Math.round(data[p + 2] * (1 - whiteMix) + 255 * whiteMix);
+              data[p + 3] = Math.round(data[p + 3] * edgeKeep);
             }
           }
         }
 
         wctx.putImageData(imageData, 0, 0);
 
-        // 6. Composite onto fresh padded canvas with a soft pure-white silhouette halo around ONLY the person
-        const haloCanvas = document.createElement('canvas');
-        haloCanvas.width = w;
-        haloCanvas.height = h;
-        const hctx = haloCanvas.getContext('2d');
-
-        const finalCanvas = document.createElement('canvas');
-        finalCanvas.width = w;
-        finalCanvas.height = h;
-        const fctx = finalCanvas.getContext('2d');
-        if (!fctx || !hctx) {
-          resolve(workCanvas.toDataURL('image/png'));
-          return;
-        }
-
-        hctx.drawImage(workCanvas, 0, 0);
-        hctx.globalCompositeOperation = 'source-in';
-        hctx.fillStyle = '#ffffff';
-        hctx.fillRect(0, 0, w, h);
-
-        const padX = 12;
-        const padTop = 10;
-        const drawW = w - padX * 2;
-        const drawH = h - padTop - 4;
-
-        fctx.imageSmoothingEnabled = true;
-        fctx.imageSmoothingQuality = 'high';
-
-        // Two soft white aura passes hugging the person's cutout shape, fading cleanly into the card
-        fctx.save();
-        fctx.shadowColor = 'rgba(255, 255, 255, 0.98)';
-        fctx.shadowBlur = 18;
-        fctx.globalAlpha = 0.85;
-        fctx.drawImage(haloCanvas, padX, padTop, drawW, drawH);
-        fctx.shadowBlur = 9;
-        fctx.globalAlpha = 0.7;
-        fctx.drawImage(haloCanvas, padX, padTop, drawW, drawH);
-        fctx.restore();
-
-        // Crisp person cutout on top
-        fctx.drawImage(workCanvas, padX, padTop, drawW, drawH);
-
-        const out = finalCanvas.toDataURL('image/png');
+        const out = workCanvas.toDataURL('image/png');
         matchedPhotoCache.set(src, out);
         resolve(out);
       } catch {
@@ -910,7 +786,7 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
             className="inline-flex items-center gap-1 px-2.5 py-[1px] rounded-full text-[5.7px] font-black tracking-[0.04em] leading-none"
             style={{
               background: 'linear-gradient(90deg, #ecfdf5 0%, #fef9c3 50%, #ecfdf5 100%)',
-              color: '#991b1b',
+              color: '#065f46',
               border: '0.8px solid #047857',
               boxShadow: '0 1px 2px rgba(4, 120, 87, 0.14)'
             }}
@@ -992,7 +868,7 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
                   {data.responsibility_en ? (
                     <>
                       {' / '}
-                      <span className={`font-extrabold uppercase ${respEnClass}`} style={{ color: '#991b1b' }}>{data.responsibility_en}</span>
+                      <span className={`font-extrabold uppercase ${respEnClass}`} style={{ color: '#1e3a8a' }}>{data.responsibility_en}</span>
                     </>
                   ) : null}
                 </div>
@@ -1005,8 +881,8 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
                 <div className="text-[6.1px] font-black leading-tight mt-[1px]" style={{ color: '#065f46' }}>{data.issued_at || "N/A"}</div>
               </div>
               <div>
-                <div className="text-[4.7px] font-black uppercase leading-none" style={{ color: '#9f1239' }}>የሚያበቃበት ቀን / Expiry Date</div>
-                <div className="text-[6.1px] font-black leading-tight mt-[1px]" style={{ color: '#dc2626' }}>{data.expires_at || "N/A"}</div>
+                <div className="text-[4.7px] font-black uppercase leading-none" style={{ color: '#1e3a8a' }}>የሚያበቃበት ቀን / Expiry Date</div>
+                <div className="text-[6.1px] font-black leading-tight mt-[1px]" style={{ color: '#b91c1c' }}>{data.expires_at || "N/A"}</div>
               </div>
             </div>
           </div>
@@ -1032,7 +908,7 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
             )}
           </div>
           <div
-            className="w-full px-1 py-[1.2px] rounded text-center leading-none"
+            className="w-full px-1 py-[1.2px] rounded text-center leading-none overflow-hidden"
             style={{
               backgroundColor: 'rgba(255, 255, 255, 0.92)',
               border: '0.8px solid #1d4ed8'
@@ -1041,8 +917,17 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
             <div className="text-[3.8px] font-black uppercase leading-none" style={{ color: '#1e3a8a' }}>
               ፋይዳ / FAYDA FIN
             </div>
-            <div className="text-[5.2px] font-black font-mono tracking-tight leading-tight truncate mt-[0.5px]" style={{ color: '#991b1b' }}>
-              {(data.fayda_number || '').trim() || "N/A"}
+            <div
+              className={`font-black font-mono tracking-tight leading-tight whitespace-nowrap truncate mt-[0.5px] ${
+                getFaydaValue(data).length > 14
+                  ? 'text-[4.3px]'
+                  : getFaydaValue(data).length > 11
+                  ? 'text-[4.7px]'
+                  : 'text-[5.2px]'
+              }`}
+              style={{ color: '#0b1b3a' }}
+            >
+              {getFaydaValue(data) || "N/A"}
             </div>
           </div>
         </div>
@@ -1186,8 +1071,8 @@ const IDCardBack = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, a
                 <span className="text-[5px] font-black uppercase tracking-wider" style={{ color: '#1e3a8a' }}>
                   ፋይዳ ቁጥር / FAYDA:
                 </span>
-                <span className="text-[7px] font-black tracking-widest font-mono" style={{ color: '#991b1b' }}>
-                  {(data.fayda_number || '').trim() || "N/A"}
+                <span className="text-[7px] font-black tracking-widest font-mono" style={{ color: '#0b1b3a' }}>
+                  {getFaydaValue(data) || "N/A"}
                 </span>
               </div>
             </div>
@@ -1336,6 +1221,8 @@ export function App() {
   const [token, setToken] = useState<string | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const isLoggingInRef = useRef(false);
+  const verifiedProfileUidRef = useRef<string | null>(null);
+  const [createPreviewSide, setCreatePreviewSide] = useState<'front' | 'back'>('front');
   const [view, setViewState] = useState<AppView>('dashboard');
   const [viewHistory, setViewHistory] = useState<AppView[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -1488,6 +1375,9 @@ export function App() {
       currentUser = cred.user;
     }
     if (currentUser) {
+      if (verifiedProfileUidRef.current === currentUser.uid) {
+        return currentUser;
+      }
       const payload: Record<string, any> = {
         email: (sessionUser.email || sessionUser.username || '').toLowerCase(),
         username: sessionUser.username || sessionUser.email || '',
@@ -1499,6 +1389,7 @@ export function App() {
         payload.user_doc_id = sessionUser.id;
       }
       await setDoc(doc(db, 'profiles', currentUser.uid), payload, { merge: true });
+      verifiedProfileUidRef.current = currentUser.uid;
     }
     return currentUser;
   };
@@ -1571,12 +1462,23 @@ export function App() {
             setToken(firebaseUser.isAnonymous ? 'firestore-session' : 'firebase-token');
             setIsAuthReady(true);
 
-            // Background verification that user account wasn't deactivated
+            // Background sync: verify profile exists & user account wasn't deactivated
+            getDoc(doc(db, 'profiles', firebaseUser.uid))
+              .then(async (pSnap) => {
+                if (!pSnap.exists()) {
+                  await ensureFirebaseSessionProfile(sessionData);
+                } else {
+                  verifiedProfileUidRef.current = firebaseUser.uid;
+                }
+              })
+              .catch(() => {});
+
             if (sessionData.id && sessionData.id !== 'superadmin-fallback') {
               getDoc(doc(db, 'users', sessionData.id))
                 .then(async (userDocSnap) => {
                   if (userDocSnap.exists() && userDocSnap.data().active === false) {
                     localStorage.removeItem('police_id_session');
+                    verifiedProfileUidRef.current = null;
                     await signOut(auth);
                     setUser(null);
                     setToken(null);
@@ -2082,15 +1984,18 @@ export function App() {
       'Are you sure you want to delete this ID record?'
     ))) return;
     try {
-      setAllRecords((prev) => prev.filter((r) => r.id !== id));
-      await raceWithTimeout(
-        updateDoc(doc(db, 'ids', id), {
-          deleted: true,
-          deleted_at: new Date().toISOString()
-        }).catch((err) => console.warn('Background delete sync:', err)),
-        150,
-        undefined
-      );
+      if (user) await ensureFirebaseSessionProfile(user);
+      const writePromise = updateDoc(doc(db, 'ids', id), {
+        deleted: true,
+        deleted_at: new Date().toISOString()
+      });
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        setAllRecords((prev) => prev.filter((r) => r.id !== id));
+        writePromise.catch((err) => console.error('Offline delete sync error:', err));
+      } else {
+        await writePromise;
+        setAllRecords((prev) => prev.filter((r) => r.id !== id));
+      }
       alert(t('መረጃው በትክክል ጠፍቷል!', 'Record deleted successfully!'));
     } catch (error: any) {
       console.error("Delete error:", error);
@@ -2100,6 +2005,7 @@ export function App() {
 
   const handleApproveRecord = async (record: IDRecord) => {
     try {
+      if (user) await ensureFirebaseSessionProfile(user);
       const now = new Date().toISOString();
       const approverName = user?.username || user?.email || 'Approver';
       const approvedPatch = {
@@ -2111,17 +2017,18 @@ export function App() {
         reviewed_by: approverName,
         reviewed_at: now
       };
+      const writePromise = updateDoc(doc(db, 'ids', record.id), approvedPatch);
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        writePromise.catch((err) => console.error('Offline approve sync error:', err));
+      } else {
+        await writePromise;
+      }
       setAllRecords((prev) => prev.map((r) => (r.id === record.id ? { ...r, ...approvedPatch } : r)));
       if (selectedRecord?.id === record.id) {
         setSelectedRecord({ ...record, ...approvedPatch });
       }
-      await raceWithTimeout(
-        updateDoc(doc(db, 'ids', record.id), approvedPatch).catch((err) => console.warn('Background approve sync:', err)),
-        150,
-        undefined
-      );
       alert(t(
-        'መታወቂያው ጸድቆ በሲስተሙ (Firestore) ውስጥ በይፋ ተመዝግቧል! አሁን ፕሪንት ማድረግ እና QR ስካን መጠቀም ይቻላል።',
+        'መታወቂያው ጸድቆ በሲስተሙ (Firestore) ውስጥ በይፋ ተመዝግቧል! አሁን ፕሪንት ማድረግና QR ስካን መጠቀም ይቻላል።',
         'ID approved and officially registered in Firestore! Printing and QR verification are now enabled.'
       ));
     } catch (error: any) {
@@ -2137,6 +2044,7 @@ export function App() {
       return;
     }
     try {
+      if (user) await ensureFirebaseSessionProfile(user);
       const patch = {
         status: 'needs_correction' as const,
         correction_note: cleanNote,
@@ -2144,17 +2052,18 @@ export function App() {
         reviewed_at: new Date().toISOString(),
         resubmitted: false
       };
+      const writePromise = updateDoc(doc(db, 'ids', record.id), patch);
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        writePromise.catch((err) => console.error('Offline correction sync error:', err));
+      } else {
+        await writePromise;
+      }
       setAllRecords((prev) => prev.map((r) => (r.id === record.id ? { ...r, ...patch } : r)));
       setCorrectionModalRecord(null);
       setCorrectionNoteInput('');
       if (selectedRecord?.id === record.id) {
         setSelectedRecord({ ...record, ...patch });
       }
-      await raceWithTimeout(
-        updateDoc(doc(db, 'ids', record.id), patch).catch((err) => console.warn('Background correction sync:', err)),
-        150,
-        undefined
-      );
       alert('ስህተቱ ተገልጾ ለመረጃ አስገቢው ተመልሷል! (Sent back for correction)');
     } catch (error: any) {
       console.error("Send back error:", error);
@@ -2165,17 +2074,19 @@ export function App() {
   const handleRejectRecord = async (record: IDRecord) => {
     if (!confirm('ይህንን መታወቂያ ውድቅ ማድረግ ይፈልጋሉ? (Reject this ID?)')) return;
     try {
+      if (user) await ensureFirebaseSessionProfile(user);
       const patch = {
         status: 'rejected' as const,
         reviewed_by: user?.username || user?.email || 'Approver',
         reviewed_at: new Date().toISOString()
       };
+      const writePromise = updateDoc(doc(db, 'ids', record.id), patch);
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        writePromise.catch((err) => console.error('Offline reject sync error:', err));
+      } else {
+        await writePromise;
+      }
       setAllRecords((prev) => prev.map((r) => (r.id === record.id ? { ...r, ...patch } : r)));
-      await raceWithTimeout(
-        updateDoc(doc(db, 'ids', record.id), patch).catch((err) => console.warn('Background reject sync:', err)),
-        150,
-        undefined
-      );
     } catch (error: any) {
       console.error("Reject error:", error);
       alert('ስህተት: ' + error.message);
@@ -2300,6 +2211,7 @@ export function App() {
               user_doc_id: userDocId,
               last_login: new Date().toISOString()
             }, { merge: true });
+            verifiedProfileUidRef.current = uid;
 
             const sessionUser = {
               id: userDocId,
@@ -2374,6 +2286,7 @@ export function App() {
         };
 
         localStorage.setItem('police_id_session', JSON.stringify(sessionUser));
+        verifiedProfileUidRef.current = fbUser.uid;
         setUser(sessionUser as any);
         setToken('firebase-token');
         setIsAuthReady(true);
@@ -2407,6 +2320,7 @@ export function App() {
   const handleLogout = async () => {
     try {
       localStorage.removeItem('police_id_session');
+      verifiedProfileUidRef.current = null;
       await signOut(auth);
       setView('dashboard');
     } catch (e) {
@@ -2769,24 +2683,95 @@ export function App() {
           .catch(() => {});
       };
 
-      const photo_url = finalData.photo_url || '';
-      const commissioner_signature = finalData.commissioner_signature || assets.commissioner_signature || '';
-      const member_signature = finalData.member_signature || '';
+      if (user) {
+        await ensureFirebaseSessionProfile(user);
+      }
 
+      let photo_url = finalData.photo_url || '';
+      if (photo_url.length > 420000 && photo_url.startsWith('data:image')) {
+        photo_url = await resizeImage(photo_url, 380, 480, false);
+      }
+      let commissioner_signature = finalData.commissioner_signature || assets.commissioner_signature || '';
+      if (commissioner_signature.length > 350000 && commissioner_signature.startsWith('data:image')) {
+        commissioner_signature = await resizeImage(commissioner_signature, 360, 180, true);
+        if (commissioner_signature.length > 450000) {
+          commissioner_signature = await resizeImage(commissioner_signature, 320, 160, false);
+        }
+      }
+      let member_signature = finalData.member_signature || '';
+      if (member_signature.length > 350000 && member_signature.startsWith('data:image')) {
+        member_signature = await resizeImage(member_signature, 360, 180, true);
+        if (member_signature.length > 450000) {
+          member_signature = await resizeImage(member_signature, 320, 160, false);
+        }
+      }
+
+      const cleanFayda = getFaydaValue(finalData);
       const recordId = finalData.id;
       const isUpdate = !!recordId;
 
-      delete finalData.id;
+      // Whitelist ONLY schema-allowed Firestore fields so legacy/extra keys or nulls never cause silent rule rejection
+      const cleanRecordCore = {
+        full_name_am: finalData.full_name_am || '',
+        full_name_en: finalData.full_name_en || '',
+        rank_am: finalData.rank_am || '',
+        rank_en: finalData.rank_en || '',
+        responsibility_am: finalData.responsibility_am || '',
+        responsibility_en: finalData.responsibility_en || '',
+        phone: finalData.phone || '',
+        photo_url,
+        blood_type: finalData.blood_type || '',
+        badge_number: finalData.badge_number || '',
+        fayda_number: cleanFayda,
+        gender: finalData.gender || '',
+        complexion: finalData.complexion || '',
+        height: finalData.height || '',
+        emergency_contact_name: finalData.emergency_contact_name || '',
+        emergency_contact_phone: finalData.emergency_contact_phone || '',
+        commissioner_signature,
+        member_signature,
+        issued_at: sanitizeText(finalData.issued_at, 40) || new Date().toISOString().split('T')[0],
+        expires_at: sanitizeText(finalData.expires_at, 40) || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
+      };
 
       if (isUpdate) {
         try {
-          const updatePayload: any = {
-            ...finalData,
-            photo_url,
-            commissioner_signature,
-            member_signature,
+          const existingRecord = allRecords.find((r) => r.id === recordId);
+          const existingStatus = finalData.status ?? existingRecord?.status;
+          const safeStatus: 'pending' | 'needs_correction' | 'approved' | 'rejected' =
+            existingStatus === 'approved' || existingStatus === 'needs_correction' || existingStatus === 'rejected' || existingStatus === 'pending'
+              ? existingStatus
+              : 'pending';
+
+          const updatePayload: Record<string, any> = {
+            ...cleanRecordCore,
+            id_number: sanitizeText(finalData.id_number ?? existingRecord?.id_number, 64) || `BGR-POL-1600001`,
+            status: safeStatus,
+            is_registered: Boolean(finalData.is_registered ?? existingRecord?.is_registered),
+            deleted: Boolean(finalData.deleted ?? existingRecord?.deleted),
+            correction_note: sanitizeText(finalData.correction_note ?? existingRecord?.correction_note, 500),
             updated_at: new Date().toISOString()
           };
+
+          const createdAt = finalData.created_at ?? existingRecord?.created_at;
+          const createdByEmail = finalData.created_by_email ?? existingRecord?.created_by_email;
+          const approvedBy = finalData.approved_by ?? existingRecord?.approved_by;
+          const approvedAt = finalData.approved_at ?? existingRecord?.approved_at;
+          const reviewedBy = finalData.reviewed_by ?? existingRecord?.reviewed_by;
+          const reviewedAt = finalData.reviewed_at ?? existingRecord?.reviewed_at;
+          const resubmitted = finalData.resubmitted ?? existingRecord?.resubmitted;
+          const resubmittedAt = finalData.resubmitted_at ?? existingRecord?.resubmitted_at;
+          const deletedAt = finalData.deleted_at ?? existingRecord?.deleted_at;
+
+          if (typeof createdAt === 'string' && createdAt) updatePayload.created_at = createdAt;
+          if (typeof createdByEmail === 'string' && createdByEmail) updatePayload.created_by_email = createdByEmail;
+          if (typeof approvedBy === 'string' && approvedBy) updatePayload.approved_by = approvedBy;
+          if (typeof approvedAt === 'string' && approvedAt) updatePayload.approved_at = approvedAt;
+          if (typeof reviewedBy === 'string' && reviewedBy) updatePayload.reviewed_by = reviewedBy;
+          if (typeof reviewedAt === 'string' && reviewedAt) updatePayload.reviewed_at = reviewedAt;
+          if (typeof resubmitted === 'boolean') updatePayload.resubmitted = resubmitted;
+          if (typeof resubmittedAt === 'string' && resubmittedAt) updatePayload.resubmitted_at = resubmittedAt;
+          if (typeof deletedAt === 'string' && deletedAt) updatePayload.deleted_at = deletedAt;
 
           if (user?.role === 'Data Entry' || updatePayload.status === 'needs_correction') {
             updatePayload.status = 'pending';
@@ -2795,15 +2780,25 @@ export function App() {
             updatePayload.resubmitted_at = new Date().toISOString();
           }
 
-          setAllRecords((prev) =>
-            prev.map((r) => (r.id === recordId ? { ...r, ...updatePayload, id: recordId } : r))
-          );
+          const updatedRecord: IDRecord = {
+            ...(existingRecord || {}),
+            ...updatePayload,
+            id: recordId
+          } as IDRecord;
 
-          await raceWithTimeout(
-            updateDoc(doc(db, 'ids', recordId), updatePayload).catch((err) => console.warn('Background update sync:', err)),
-            150,
-            undefined
+          const writePromise = setDoc(doc(db, 'ids', recordId), updatePayload);
+          if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            writePromise.catch((err) => {
+              console.error('Offline update sync failed:', err);
+            });
+          } else {
+            await writePromise;
+          }
+
+          setAllRecords((prev) =>
+            prev.map((r) => (r.id === recordId ? updatedRecord : r))
           );
+          setSelectedRecord(updatedRecord);
           triggerBackgroundRefinement(recordId);
 
           if (user?.role === 'Data Entry') {
@@ -2817,6 +2812,9 @@ export function App() {
               "Record updated successfully!"
             ));
           }
+
+          setSelectedRecord(updatedRecord);
+          setShowPreview(true);
         } catch (error) {
           handleFirestoreError(error, OperationType.UPDATE, `ids/${recordId}`);
         }
@@ -2843,11 +2841,9 @@ export function App() {
 
           const id_number = `BGR-POL-16${String(nextNum).padStart(5, '0')}`;
           const newRecordData = {
-            ...finalData,
+            ...cleanRecordCore,
             id_number,
-            photo_url,
-            commissioner_signature,
-            member_signature,
+            deleted: false,
             status: 'pending' as const,
             is_registered: false,
             correction_note: '',
@@ -2859,13 +2855,16 @@ export function App() {
           const newDocRef = doc(collection(db, 'ids'));
           const createdRecord: IDRecord = { id: newDocRef.id, ...newRecordData };
 
-          // Optimistically update UI immediately; IndexedDB persistentLocalCache commits locally in <15ms & syncs when online
+          const createPromise = setDoc(newDocRef, newRecordData);
+          if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+            createPromise.catch((err) => {
+              console.error('Offline create sync failed:', err);
+            });
+          } else {
+            await createPromise;
+          }
+
           setAllRecords((prev) => [createdRecord, ...prev]);
-          await raceWithTimeout(
-            setDoc(newDocRef, newRecordData).catch((err) => console.warn('Background create sync:', err)),
-            150,
-            undefined
-          );
           triggerBackgroundRefinement(newDocRef.id);
 
           alert(t(
@@ -2893,6 +2892,8 @@ export function App() {
             "አዝናለሁ! ይህን ተግባር ለማከናወን የሚያስችል በቂ ፈቃድ የለዎትም። እባክዎ እንደገና ይግቡ ወይም አስተዳዳሪውን ያነጋግሩ።",
             "Permission Denied: You do not have sufficient permissions for this action. Please sign in again."
           );
+        } else if (parsed.error) {
+          errorMsg = parsed.error;
         }
       } catch (e) {
         if (error.message.includes("insufficient permissions") || error.message.includes("PERMISSION_DENIED")) {
@@ -2909,9 +2910,9 @@ export function App() {
     }
   };
 
-  // Verification View Logic
-  if (isMounted && window.location.pathname.startsWith('/verify/')) {
-    const idNum = window.location.pathname.split('/')[2];
+  // Verification View Logic (Strictly isolated read-only QR verification route)
+  if (isMounted && (window.location.pathname === '/verify' || window.location.pathname.startsWith('/verify/'))) {
+    const idNum = window.location.pathname.replace(/^\/verify\/?/, '').split('/')[0] || '';
     return <VerificationView idNumber={idNum} assets={assets} lang={lang} onChangeLang={changeLang} />;
   }
 
@@ -2997,10 +2998,10 @@ export function App() {
               )}
             </div>
             <div className="min-w-0">
-              <h1 className="text-sm font-extrabold tracking-tight text-white truncate">
+              <h1 className="text-sm font-black tracking-tight text-white truncate">
                 {t('ቢጂአር ፖሊስ', 'BGR Police')}
               </h1>
-              <p className="text-[10px] font-semibold text-[#E5C158] uppercase tracking-wider truncate">
+              <p className="text-[10px] font-bold text-[#E5C158] uppercase tracking-wider truncate">
                 {t('የመታወቂያ ሲስተም', 'ID Registry')}
               </p>
             </div>
@@ -3110,11 +3111,11 @@ export function App() {
             )}
 
             <div className="flex items-center gap-2 min-w-0 text-sm">
-              <span className="hidden sm:inline text-slate-600 font-bold truncate">
+              <span className="hidden sm:inline text-slate-700 font-black truncate">
                 {t('ቢጂአር ፖሊስ ኮሚሽን', 'BGR Police')}
               </span>
               <ChevronRight size={14} className="hidden sm:inline text-slate-400 shrink-0" />
-              <span className="font-bold text-[#0B1B3A] truncate">{viewTitleMap[view]}</span>
+              <span className="font-black text-[#0B1B3A] truncate">{viewTitleMap[view]}</span>
             </div>
           </div>
 
@@ -3198,13 +3199,13 @@ export function App() {
                       )}
                     </div>
                     <div className="space-y-1.5">
-                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/10 border border-white/15 text-[#E5C158] text-[11px] font-bold uppercase tracking-wider">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-md bg-white/10 border border-white/15 text-[#E5C158] text-[11px] font-extrabold uppercase tracking-wider">
                         {t('ይፋዊ የመታወቂያ መመዝገቢያ ፖርታል', 'Official ID Issuance & Verification Portal')}
                       </span>
-                      <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold tracking-tight text-white">
+                      <h2 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white">
                         {t('ቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን', 'Benishangul-Gumuz Region Police Commission')}
                       </h2>
-                      <p className="text-xs sm:text-sm text-slate-300 max-w-2xl">
+                      <p className="text-xs sm:text-sm font-semibold text-slate-200 max-w-2xl">
                         {t(
                           'አዘጋጁ መታወቂያውን ካዘጋጀ በኋላ ለአጽዳቂ ይልካል። አጽዳቂው ሲያጸድቀው በፋየርስቶር ተመዝግቦ ፕሪንትና QR ስካን ይከፈታል።',
                           'Preparers submit new IDs to the Approver. Printing and QR scanning remain strictly locked until official approval registers the card in Firestore.'
@@ -3273,10 +3274,10 @@ export function App() {
                     <Lock size={18} />
                   </div>
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">
+                    <h3 className="text-sm font-black text-slate-950">
                       {t('የደህንነት ህግ፡ ያልጸደቀ መታወቂያ አይታተምም እና ስካን አይሆንም', 'Security Rule: Unapproved IDs Cannot Be Printed or Scanned')}
                     </h3>
-                    <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+                    <p className="text-xs font-semibold text-slate-600 mt-0.5 leading-relaxed">
                       {t(
                         'አዘጋጁ መረጃውን አስገብቶ ለአጽዳቂው ይልካል። አጽዳቂው "አጽድቅ" ሲል መታወቂያው በሲስተሙ ይመዘገባል፤ ፕሪንት ማድረግ እና QR ስካን ወዲያውኑ ይሰራል።',
                         'Once submitted by Data Entry, the Approver reviews and approves the record to register it in Firestore and unlock printing and live QR verification.'
@@ -3291,7 +3292,7 @@ export function App() {
                       setStatusFilter('pending');
                       navigateTo('history');
                     }}
-                    className="px-4 py-2 bg-[#0B1B3A] hover:bg-[#142952] text-white rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 cursor-pointer"
+                    className="px-4 py-2 bg-[#0B1B3A] hover:bg-[#142952] text-white rounded-xl text-xs font-extrabold transition-all whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     {t(`በጥበቃ ላይ ያሉትን እይ (${pendingReviewCount})`, `Review Queue (${pendingReviewCount})`)}
                   </button>
@@ -3302,7 +3303,7 @@ export function App() {
                 <div className="bg-white rounded-2xl p-6 sm:p-7 shadow-xs border border-slate-200 space-y-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div>
-                      <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-black text-slate-950 flex items-center gap-2">
                         <Camera size={20} className="text-[#1E40AF]" />
                         {t('የፖሊስ ኮሚሽኑ ሎጎ እና የሲስተም ፋይሎች (Admin Assets)', 'Commission Logo & System Assets (Admin)')}
                       </h3>
@@ -3387,10 +3388,10 @@ export function App() {
                     )}
                   </div>
                   <div>
-                    <h4 className="text-sm font-bold text-slate-900">
+                    <h4 className="text-sm font-black text-slate-950">
                       {t('ቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን ይፋዊ ሲስተም', 'Benishangul-Gumuz Region Police Commission Official System')}
                     </h4>
-                    <p className="text-xs text-slate-500 mt-0.5">
+                    <p className="text-xs font-semibold text-slate-600 mt-0.5">
                       {t('የመታወቂያ ዝግጅት፣ ማረጋገጫ እና የማጽደቅ ሂደት በዚህ ዳሽቦርድ ይከናወናል።', 'ID card preparation, verification, and approval workflow are managed here.')}
                     </p>
                   </div>
@@ -3483,7 +3484,19 @@ export function App() {
                         <FormInput label={t('ኃላፊነት (እንግሊዝኛ)', 'Responsibility (EN)')} value={formData.responsibility_en} onChange={(v) => setFormData((prev) => ({...prev, responsibility_en: v}))} placeholder="Responsibility" icon={<Briefcase size={17}/>} />
                       </div>
                       <FormInput label={t('ስልክ ቁጥር', 'Phone Number')} value={formData.phone} onChange={(v) => setFormData((prev) => ({...prev, phone: v}))} placeholder="+251..." icon={<Phone size={17}/>} />
-                      <FormInput label={t('የፋይዳ ቁጥር (FIN)', 'Fayda Number (FIN)')} value={formData.fayda_number} onChange={(v) => setFormData((prev) => ({...prev, fayda_number: v}))} placeholder={t('የፋይዳ መለያ ቁጥር ያስገቡ', 'Enter Fayda FIN number')} icon={<CreditCard size={17}/>} />
+                      <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200 space-y-1.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-[11px] font-black text-[#1E3A8A] uppercase tracking-wider">
+                            {t('ፋይዳ መለያ ቁጥር (በመታወቂያው ፊትና ጀርባ ላይ ይገባል)', 'Fayda FIN (Appears on Front & Back ID)')}
+                          </span>
+                          {getFaydaValue(formData) && (
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[10px] font-black font-mono">
+                              {t('ተገናኝቷል', 'Synced')}
+                            </span>
+                          )}
+                        </div>
+                        <FormInput label={t('የፋይዳ ቁጥር (FIN)', 'Fayda Number (FIN)')} value={formData.fayda_number} onChange={(v) => setFormData((prev) => ({...prev, fayda_number: v}))} placeholder={t('የፋይዳ መለያ ቁጥር ያስገቡ (ለምሳሌ 1234 5678 9012)', 'Enter Fayda FIN number')} icon={<CreditCard size={17}/>} />
+                      </div>
 
                       <div className="pt-4 border-t border-slate-200">
                         <h4 className="text-xs font-extrabold text-[#B45309] uppercase tracking-wider mb-3">
@@ -3572,7 +3585,7 @@ export function App() {
                               if (!file) return;
                               const reader = new FileReader();
                               reader.onloadend = async () => {
-                                const base64 = await resizeImage(reader.result as string, 400, 200);
+                                const base64 = await resizeImage(reader.result as string, 360, 180, true);
                                 setFormData((prev) => ({ ...prev, member_signature: base64 }));
                               };
                               reader.readAsDataURL(file);
@@ -3601,12 +3614,68 @@ export function App() {
                               if (!file) return;
                               const reader = new FileReader();
                               reader.onloadend = async () => {
-                                const base64 = await resizeImage(reader.result as string, 400, 200);
+                                const base64 = await resizeImage(reader.result as string, 360, 180, true);
                                 setFormData((prev) => ({ ...prev, commissioner_signature: base64 }));
                               };
                               reader.readAsDataURL(file);
                             }}
                           />
+                        </div>
+                      </div>
+
+                      {/* Live ID Card Preview synced directly with the form */}
+                      <div className="p-4 bg-[#F4F6FA] rounded-2xl border border-slate-200 space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-black text-[#0B1B3A]">
+                            {t('የመታወቂያ ቀጥታ እይታ', 'Live ID Card Preview')}
+                          </span>
+                          <div className="inline-flex bg-white border border-slate-200 p-0.5 rounded-lg">
+                            <button
+                              type="button"
+                              onClick={() => setCreatePreviewSide('front')}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-black cursor-pointer transition-all ${
+                                createPreviewSide === 'front' ? 'bg-[#0B1B3A] text-white' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              {t('የፊት ገፅ', 'Front')}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setCreatePreviewSide('back')}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-black cursor-pointer transition-all ${
+                                createPreviewSide === 'back' ? 'bg-[#0B1B3A] text-white' : 'text-slate-600 hover:text-slate-900'
+                              }`}
+                            >
+                              {t('የጀርባ ገፅ', 'Back')}
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex justify-center overflow-x-auto py-1">
+                          <div className="origin-top shadow-lg rounded-[3.18mm]">
+                            {createPreviewSide === 'front' ? (
+                              <IDCardFront
+                                data={{
+                                  ...formData,
+                                  id: formData.id || 'preview',
+                                  id_number: formData.id_number || 'BGR-POL-1600001',
+                                  commissioner_signature: formData.commissioner_signature || assets.commissioner_signature || '',
+                                  status: (formData.status as any) || 'pending',
+                                }}
+                                assets={assets}
+                              />
+                            ) : (
+                              <IDCardBack
+                                data={{
+                                  ...formData,
+                                  id: formData.id || 'preview',
+                                  id_number: formData.id_number || 'BGR-POL-1600001',
+                                  commissioner_signature: formData.commissioner_signature || assets.commissioner_signature || '',
+                                  status: (formData.status as any) || 'pending',
+                                }}
+                                assets={assets}
+                              />
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -3651,8 +3720,8 @@ export function App() {
             >
               <div className="flex flex-wrap justify-between items-center gap-4">
                 <div>
-                  <h2 className="text-2xl font-extrabold text-slate-900">{t('የሲስተም ጥገና', 'System Maintenance')}</h2>
-                  <p className="text-sm text-slate-500">{t('የሲስተም ፋይሎችን እና ደህንነትን ይቆጣጠሩ', 'Manage system storage, database status, and official signature assets')}</p>
+                  <h2 className="text-2xl font-black text-slate-950">{t('የሲስተም ጥገና', 'System Maintenance')}</h2>
+                  <p className="text-sm font-semibold text-slate-600">{t('የሲስተም ፋይሎችን እና ደህንነትን ይቆጣጠሩ', 'Manage system storage, database status, and official signature assets')}</p>
                 </div>
                 <button
                   type="button"
@@ -3668,7 +3737,7 @@ export function App() {
                 <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
                   <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
                     <DbIcon size={18} className="text-[#1E40AF]" />
-                    <h3 className="font-bold text-slate-900">{t('የመረጃ ማስቀመጫ', 'Database Storage')}</h3>
+                    <h3 className="font-black text-slate-950">{t('የመረጃ ማስቀመጫ', 'Database Storage')}</h3>
                   </div>
                   <div className="p-6 space-y-4">
                     <div className="flex justify-between items-center">
@@ -3697,7 +3766,7 @@ export function App() {
                 <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
                   <div className="px-6 py-4 border-b border-slate-200 bg-slate-50 flex items-center gap-2">
                     <Award size={18} className="text-[#1E40AF]" />
-                    <h3 className="font-bold text-slate-900">{t('የሲስተም ፋይሎች', 'Official Signature Asset')}</h3>
+                    <h3 className="font-black text-slate-950">{t('የሲስተም ፋይሎች', 'Official Signature Asset')}</h3>
                   </div>
                   <div className="p-6 space-y-4">
                     <div className="space-y-2">
@@ -3741,10 +3810,10 @@ export function App() {
                     {t('ተመለስ', 'Back')}
                   </button>
                   <div>
-                    <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">
+                    <h2 className="text-xl sm:text-2xl font-black text-slate-950">
                       {t('የአባላት መታወቂያ መዝገብ እና ማጽደቂያ', 'Member ID Registry & Approval Queue')}
                     </h2>
-                    <p className="text-xs text-slate-500">
+                    <p className="text-xs font-semibold text-slate-600">
                       {t('ያልጸደቁ መታወቂያዎች ፕሪንት አይሆኑም እንዲሁም QR ስካን አይሰሩም።', 'Only approved & registered IDs can be printed or scanned.')}
                     </p>
                   </div>
@@ -3816,11 +3885,11 @@ export function App() {
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
-                      <th className="px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('አባል', 'Member')}</th>
-                      <th className="px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('መታወቂያ / ፋይዳ', 'ID / Fayda')}</th>
-                      <th className="px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('ማዕረግ እና ኃላፊነት', 'Rank & Role')}</th>
-                      <th className="px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider">{t('ሁኔታ', 'Status')}</th>
-                      <th className="px-5 py-3.5 text-[11px] font-bold text-slate-500 uppercase tracking-wider text-right">{t('ተግባራት', 'Actions')}</th>
+                      <th className="px-5 py-3.5 text-[11px] font-black text-slate-700 uppercase tracking-wider">{t('አባል', 'Member')}</th>
+                      <th className="px-5 py-3.5 text-[11px] font-black text-slate-700 uppercase tracking-wider">{t('መታወቂያ / ፋይዳ', 'ID / Fayda')}</th>
+                      <th className="px-5 py-3.5 text-[11px] font-black text-slate-700 uppercase tracking-wider">{t('ማዕረግ እና ኃላፊነት', 'Rank & Role')}</th>
+                      <th className="px-5 py-3.5 text-[11px] font-black text-slate-700 uppercase tracking-wider">{t('ሁኔታ', 'Status')}</th>
+                      <th className="px-5 py-3.5 text-[11px] font-black text-slate-700 uppercase tracking-wider text-right">{t('ተግባራት', 'Actions')}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -3839,8 +3908,8 @@ export function App() {
                           <div className="flex items-center gap-3">
                             <img src={record.photo_url || 'https://picsum.photos/seed/police/80/80'} className="w-10 h-10 rounded-full object-cover border border-slate-200 shrink-0" alt="" />
                             <div className="min-w-0">
-                              <p className="text-sm font-bold text-slate-900 truncate">{record.full_name_am}</p>
-                              <p className="text-xs text-slate-500 uppercase truncate">{record.full_name_en}</p>
+                              <p className="text-sm font-black text-slate-950 truncate">{record.full_name_am}</p>
+                              <p className="text-xs font-bold text-slate-600 uppercase truncate">{record.full_name_en}</p>
                               {record.created_by_email && (
                                 <p className="text-[11px] text-slate-600 font-semibold truncate">
                                   {t('አዘጋጅ፡', 'By:')} {record.created_by_email}
@@ -3864,15 +3933,15 @@ export function App() {
                               {record.id_number}
                             </button>
                             {record.fayda_number && (
-                              <span className="px-2.5 py-0.5 bg-gradient-to-r from-amber-50 to-emerald-50 border border-amber-300 text-[#0B1B3A] rounded-full text-[10px] font-bold font-mono tabular-nums w-fit">
+                              <span className="px-2.5 py-0.5 bg-gradient-to-r from-amber-50 to-emerald-50 border border-amber-300 text-[#0B1B3A] rounded-full text-[10px] font-black font-mono tabular-nums w-fit">
                                 FIN: {record.fayda_number}
                               </span>
                             )}
                           </div>
                         </td>
                         <td className="px-5 py-4">
-                          <p className="text-sm font-semibold text-slate-800">{record.rank_am}</p>
-                          <p className="text-xs text-slate-500">{record.responsibility_en || record.responsibility_am}</p>
+                          <p className="text-sm font-extrabold text-slate-900">{record.rank_am}</p>
+                          <p className="text-xs font-semibold text-slate-600">{record.responsibility_en || record.responsibility_am}</p>
                         </td>
                         <td className="px-5 py-4">
                           <div className="space-y-1.5">
@@ -3957,7 +4026,7 @@ export function App() {
                                     ...emptyForm,
                                     ...record,
                                     id: record.id,
-                                    fayda_number: record.fayda_number || '',
+                                    fayda_number: getFaydaValue(record),
                                     member_signature: record.member_signature || '',
                                     issued_at: record.issued_at || new Date().toISOString().split('T')[0],
                                     expires_at: record.expires_at || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
@@ -4071,40 +4140,41 @@ export function App() {
       </div>
 
       <AnimatePresence>
-        {showPreview && selectedRecord && (
+        {showPreview && selectedRecord && (() => {
+          const liveSelectedRecord = allRecords.find((r) => r.id === selectedRecord.id) || selectedRecord;
+          return (
           <PreviewModal
-            record={selectedRecord}
+            record={liveSelectedRecord}
             assets={assets}
             lang={lang}
             onClose={() => setShowPreview(false)}
-            onPrint={(side) => handlePrintSide(side, selectedRecord)}
-            onDownload={(side) => handleDownload(selectedRecord.id_number, side, selectedRecord)}
+            onPrint={(side) => handlePrintSide(side, liveSelectedRecord)}
+            onDownload={(side) => handleDownload(liveSelectedRecord.id_number, side, liveSelectedRecord)}
             onEdit={() => {
-              if (selectedRecord) {
-                setFormData({
-                  ...emptyForm,
-                  ...selectedRecord,
-                  id: selectedRecord.id,
-                  fayda_number: selectedRecord.fayda_number || '',
-                  member_signature: selectedRecord.member_signature || '',
-                  issued_at: selectedRecord.issued_at || new Date().toISOString().split('T')[0],
-                  expires_at: selectedRecord.expires_at || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
-                  id_number: selectedRecord.id_number || '',
-                  status: selectedRecord.status || '',
-                  correction_note: selectedRecord.correction_note || ''
-                });
-                setShowPreview(false);
-                navigateTo('create');
-              }
+              setFormData({
+                ...emptyForm,
+                ...liveSelectedRecord,
+                id: liveSelectedRecord.id,
+                fayda_number: getFaydaValue(liveSelectedRecord),
+                member_signature: liveSelectedRecord.member_signature || '',
+                issued_at: liveSelectedRecord.issued_at || new Date().toISOString().split('T')[0],
+                expires_at: liveSelectedRecord.expires_at || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
+                id_number: liveSelectedRecord.id_number || '',
+                status: liveSelectedRecord.status || '',
+                correction_note: liveSelectedRecord.correction_note || ''
+              });
+              setShowPreview(false);
+              navigateTo('create');
             }}
-            onApprove={isApproverOrAdmin ? () => handleApproveRecord(selectedRecord) : undefined}
+            onApprove={isApproverOrAdmin ? () => handleApproveRecord(liveSelectedRecord) : undefined}
             onRequestCorrection={isApproverOrAdmin ? () => {
-              setCorrectionModalRecord(selectedRecord);
-              setCorrectionNoteInput(selectedRecord.correction_note || '');
+              setCorrectionModalRecord(liveSelectedRecord);
+              setCorrectionNoteInput(liveSelectedRecord.correction_note || '');
             } : undefined}
             user={user}
           />
-        )}
+          );
+        })()}
       </AnimatePresence>
 
       {/* Correction Note Modal */}
@@ -4175,7 +4245,7 @@ export function App() {
                           ...emptyForm,
                           ...rec,
                           id: rec.id,
-                          fayda_number: rec.fayda_number || '',
+                          fayda_number: getFaydaValue(rec),
                           member_signature: rec.member_signature || '',
                           issued_at: rec.issued_at || new Date().toISOString().split('T')[0],
                           expires_at: rec.expires_at || new Date(new Date().setFullYear(new Date().getFullYear() + 2)).toISOString().split('T')[0],
@@ -4496,10 +4566,10 @@ function PreviewModal({
               {t('ተመለስ', 'Back')}
             </button>
             <div className="min-w-0">
-              <h3 className="text-base sm:text-lg font-bold text-slate-900 truncate">
+              <h3 className="text-base sm:text-lg font-black text-slate-950 truncate">
                 {t('የመታወቂያ ካርድ ዝርዝር እይታ', 'ID Card Inspection & Print Preview')}
               </h3>
-              <p className="text-xs text-slate-500 truncate">
+              <p className="text-xs font-semibold text-slate-600 truncate">
                 {t('ከማተምዎ በፊት የፊት እና የጀርባ ገጾችን ያረጋግጡ', 'Verify front & back details before approval or printing')}
               </p>
             </div>
@@ -4741,10 +4811,10 @@ function NavButton({
     <button
       type="button"
       onClick={onClick}
-      className={`w-full flex items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+      className={`w-full flex items-center justify-between gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
         active
           ? 'bg-[#1E40AF] text-white shadow-sm'
-          : 'text-slate-300 hover:text-white hover:bg-white/10'
+          : 'text-slate-200 hover:text-white hover:bg-white/10'
       }`}
     >
       <span className="flex items-center gap-2.5 min-w-0 truncate">
@@ -4752,7 +4822,7 @@ function NavButton({
         <span className="truncate">{label}</span>
       </span>
       {badge !== undefined && badge > 0 && (
-        <span className="px-2 py-0.5 rounded-md bg-[#C89B2B] text-[#0B1B3A] text-[10px] font-extrabold tabular-nums shrink-0">
+        <span className="px-2 py-0.5 rounded-md bg-[#C89B2B] text-[#0B1B3A] text-[10px] font-black tabular-nums shrink-0">
           {badge}
         </span>
       )}
@@ -4784,8 +4854,8 @@ function StatCard({
         {icon}
       </div>
       <div className="min-w-0">
-        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider truncate">{title}</p>
-        <p className="text-2xl font-extrabold text-slate-900 tabular-nums mt-0.5">{value}</p>
+        <p className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider truncate">{title}</p>
+        <p className="text-2xl font-black text-slate-950 tabular-nums mt-0.5">{value}</p>
       </div>
     </div>
   );
@@ -4806,7 +4876,7 @@ function AssetUpload({
 }) {
   return (
     <div className="space-y-2.5">
-      <p className="text-xs font-bold text-slate-700 truncate">{label}</p>
+      <p className="text-xs font-extrabold text-slate-900 truncate">{label}</p>
       <div
         className="relative group w-full aspect-video bg-white rounded-xl border border-dashed border-slate-300 overflow-hidden flex items-center justify-center"
         style={previewBg ? { background: previewBg } : undefined}
@@ -4835,7 +4905,8 @@ function FormInput({ label, value, onChange, placeholder, icon }: { label: strin
         </div>
         <input
           type="text"
-          value={value || ''}
+          autoComplete="off"
+          value={value ?? ''}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           className="w-full pl-10 pr-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-[#065F46] placeholder:text-slate-400 placeholder:font-normal focus:bg-white focus:border-[#047857] focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all"
@@ -4924,10 +4995,10 @@ function Login({
           </div>
 
           <div className="space-y-1.5">
-            <h2 className="text-lg sm:text-xl font-extrabold text-[#E5C158] leading-snug">
+            <h2 className="text-lg sm:text-xl font-black text-[#E5C158] leading-snug">
               {t('ቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን', 'Benishangul-Gumuz Region Police Commission')}
             </h2>
-            <p className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+            <p className="text-xs font-extrabold text-slate-200 uppercase tracking-wider">
               {t('የመታወቂያ ዝግጅትና ማረጋገጫ ሲስተም', 'Official ID Issuance & Verification System')}
             </p>
           </div>
@@ -5229,8 +5300,8 @@ function UserManagement({
             {t('ተመለስ', 'Back')}
           </button>
           <div>
-            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900">{t('የተጠቃሚዎች አስተዳደር', 'User & Role Management')}</h2>
-            <p className="text-xs sm:text-sm text-slate-500">
+            <h2 className="text-xl sm:text-2xl font-black text-slate-950">{t('የተጠቃሚዎች አስተዳደር', 'User & Role Management')}</h2>
+            <p className="text-xs sm:text-sm font-semibold text-slate-600">
               {t('የራስዎን እና የሌሎችን (መረጃ አስገቢ፣ አጽዳቂ፣ ተመልካች) መለያ እና ሚና ያስተዳድሩ', 'Manage credentials and roles for Administrators, Approvers, Data Entry, and Viewers')}
             </p>
           </div>
@@ -5307,7 +5378,7 @@ function UserManagement({
       <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200 bg-slate-50">
+            <tr className="text-[11px] font-black text-slate-700 uppercase tracking-wider border-b border-slate-200 bg-slate-50">
               <th className="px-5 py-3.5">{t('ዩሰርኔም', 'Username')}</th>
               <th className="px-5 py-3.5">{t('ኢሜይል', 'Email')}</th>
               <th className="px-5 py-3.5">{t('ሚና', 'Role')}</th>
@@ -5318,7 +5389,7 @@ function UserManagement({
           <tbody className="divide-y divide-slate-100">
             {users.map((u) => (
               <tr key={u.id} className="hover:bg-slate-50/70 transition-colors">
-                <td className="px-5 py-4 font-bold text-slate-800 text-sm">{u.username || u.email}</td>
+                <td className="px-5 py-4 font-black text-slate-950 text-sm">{u.username || u.email}</td>
                 <td className="px-5 py-4 text-sm text-slate-500">{u.email || '-'}</td>
                 <td className="px-5 py-4">
                   <select
@@ -5587,8 +5658,19 @@ function VerificationView({
   const [verifyState, setVerifyState] = useState<'approved' | 'unapproved' | 'deleted' | 'expired' | 'not_found'>('not_found');
   const [assets, setAssets] = useState<Assets>(initialAssets);
   const [loading, setLoading] = useState(true);
-  const [flipped, setFlipped] = useState(false);
+  const [scannedAt, setScannedAt] = useState<string>('');
   const matchedLogo = useCardMatchedLogo(assets.police_logo);
+
+  // Strict read-only guard: block print, save, view-source, and copy shortcuts while on QR verification page
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && ['p', 's', 'c', 'u', 'x'].includes(e.key.toLowerCase())) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -5598,42 +5680,56 @@ function VerificationView({
             await signInAnonymously(auth);
           } catch {}
         }
-        const cleanId = decodeURIComponent(idNumber || '').trim();
+        const cleanId = sanitizeText(decodeURIComponent(idNumber || ''), 64);
+        const nowIso = new Date().toISOString();
+        setScannedAt(nowIso);
+
+        if (!cleanId) {
+          setRecord(null);
+          setVerifyState('not_found');
+          setLoading(false);
+          return;
+        }
+
         const q = query(collection(db, 'ids'), where('id_number', '==', cleanId), limit(1));
         const querySnapshot = await getDocs(q);
+        let statusAtScan = 'not_found';
+
         if (!querySnapshot.empty) {
           const recordDoc = querySnapshot.docs[0];
           const recordData = { ...recordDoc.data(), id: recordDoc.id } as IDRecord;
+          statusAtScan = recordData.deleted ? 'deleted' : (recordData.status || 'pending');
 
           if (recordData.deleted) {
             setRecord(null);
             setVerifyState('deleted');
           } else if (recordData.status !== 'approved' || recordData.is_registered === false) {
-            // Unapproved IDs MUST NOT verify or work on scan!
+            // Unapproved IDs MUST NOT verify or display card data on scan
             setRecord(null);
             setVerifyState('unapproved');
           } else if (recordData.expires_at && new Date(recordData.expires_at) < new Date()) {
             setRecord(recordData);
             setVerifyState('expired');
+            statusAtScan = 'expired';
           } else {
             setRecord(recordData);
             setVerifyState('approved');
           }
-
-          // Log scan attempt for audit trail
-          try {
-            await addDoc(collection(db, 'scans'), {
-              id_number: cleanId,
-              status_at_scan: recordData.deleted ? 'deleted' : (recordData.status || 'pending'),
-              timestamp: new Date().toISOString(),
-              ip: 'Client-side',
-              user_agent: navigator.userAgent
-            });
-          } catch {}
         } else {
           setRecord(null);
           setVerifyState('not_found');
         }
+
+        // Persist every QR scan event in Firestore scans collection for strict security auditing
+        try {
+          await addDoc(collection(db, 'scans'), {
+            id_number: cleanId,
+            status_at_scan: statusAtScan,
+            timestamp: nowIso,
+            ip: 'QR-Verify-ReadOnly',
+            user_agent: (navigator.userAgent || 'Unknown').slice(0, 500)
+          });
+        } catch {}
 
         if (!assets.police_logo || !assets.bgr_flag || !assets.eth_flag) {
           const publicKeys: (keyof Assets)[] = ['police_logo', 'bgr_flag', 'eth_flag'];
@@ -5666,15 +5762,11 @@ function VerificationView({
   }, [idNumber]);
 
   const TopBar = (
-    <div className="w-full max-w-4xl flex items-center justify-between gap-3 mb-6">
-      <button
-        type="button"
-        onClick={() => { window.location.href = '/'; }}
-        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 border border-white/15 text-white text-xs font-bold transition-all cursor-pointer whitespace-nowrap"
-      >
-        <ArrowLeft size={14} />
-        {t('ወደ መግቢያ ተመለስ', 'Back to Portal')}
-      </button>
+    <div className="w-full max-w-2xl flex items-center justify-between gap-3 mb-6">
+      <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-white/10 border border-white/15 text-[#E5C158] text-xs font-extrabold whitespace-nowrap">
+        <Lock size={14} />
+        {t('የማረጋገጫ ገፅ ብቻ (Read-Only)', 'Read-Only Verification Only')}
+      </div>
       <div className="inline-flex items-center bg-white/10 border border-white/15 p-0.5 rounded-xl">
         <button
           type="button"
@@ -5700,7 +5792,7 @@ function VerificationView({
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0B1B3A]">
+      <div className="min-h-screen flex items-center justify-center bg-[#0B1B3A] select-none verify-readonly-block">
         <Loader2 className="animate-spin text-[#C89B2B]" size={44} />
       </div>
     );
@@ -5710,27 +5802,33 @@ function VerificationView({
     const isUnapproved = verifyState === 'unapproved';
     const isDeleted = verifyState === 'deleted';
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0B1B3A] p-6 sm:p-10 text-center">
+      <div
+        onContextMenu={(e) => e.preventDefault()}
+        onDragStart={(e) => e.preventDefault()}
+        onCopy={(e) => e.preventDefault()}
+        onCut={(e) => e.preventDefault()}
+        className="min-h-screen flex flex-col items-center justify-center bg-[#0B1B3A] p-6 sm:p-10 text-center select-none verify-readonly-block"
+      >
         {TopBar}
         <div className="w-full max-w-md bg-white rounded-2xl border border-slate-200 shadow-2xl p-8 flex flex-col items-center">
           <div className="w-16 h-16 bg-red-50 border border-red-200 text-red-600 rounded-2xl flex items-center justify-center mb-5">
             {isUnapproved ? <Lock size={32} /> : <X size={32} />}
           </div>
-          <h1 className="text-xl font-extrabold text-slate-900">
+          <h1 className="text-xl font-black text-slate-900">
             {isUnapproved
               ? t('ያልጸደቀ እና በሲስተም ያልተመዘገበ መታወቂያ', 'Unapproved & Unregistered ID Card')
               : isDeleted
-              ? t('የተሰረዘ መታወቂያ', 'Revoked Official ID')
-              : t('ልክ ያልሆነ / ያልተገኘ መታወቂያ', 'Invalid or Unregistered ID')}
+              ? t('የተሰረዘ / ህጋዊ ያልሆነ መታወቂያ', 'Revoked / Invalid Official ID')
+              : t('ትክክለኛ ያልሆነ / ያልተገኘ መታወቂያ', 'Invalid or Unregistered ID')}
           </h1>
           <p className="text-xs font-mono font-bold text-red-700 bg-red-50 border border-red-200 px-3 py-1 rounded-lg mt-3">
-            {decodeURIComponent(idNumber || '')}
+            {decodeURIComponent(idNumber || '') || 'N/A'}
           </p>
-          <p className="text-sm text-slate-600 mt-4 leading-relaxed">
+          <p className="text-sm font-medium text-slate-600 mt-4 leading-relaxed">
             {isUnapproved
               ? t(
-                  'ይህ መታወቂያ እስካሁን በአጽዳቂው አልጸደቀም። አጽዳቂው "አጽድቅ" እስኪል ድረስ በሲስተሙ ውስጥ አልተመዘገበም እና ስካን አይሰራም።',
-                  'This ID card has NOT been approved by the Approver yet. Until approved, it is unregistered in the official system and cannot be scanned or verified.'
+                  'ይህ መታወቂያ እስካሁን በአጽዳቂው አልጸደቀም። አጽዳቂው "አጽድቅ" እስኪል ድረስ በሲስተሙ ውስጥ አልተመዘገበም እና ተቀባይነት የለውም።',
+                  'This ID card has NOT been approved by the Approver yet and is not authentic or valid.'
                 )
               : isDeleted
               ? t(
@@ -5738,101 +5836,121 @@ function VerificationView({
                   'This ID card has been revoked from the official system and is no longer valid.'
                 )
               : t(
-                  'ይህ መለያ ቁጥር በመረጃ ቋታችን ውስጥ አልተመዘገበም።',
+                  'ይህ መለያ ቁጥር በመረጃ ቋታችን ውስጥ አልተመዘገበም፤ እባክዎ ትክክለኛነቱን ያረጋግጡ።',
                   'This ID number was not found in the official Benishangul-Gumuz Police Commission registry.'
                 )}
           </p>
-          <button
-            type="button"
-            onClick={() => { window.location.href = '/'; }}
-            className="mt-6 w-full py-2.5 px-5 bg-[#0B1B3A] hover:bg-[#142952] text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
-          >
-            <ArrowLeft size={15} />
-            {t('ወደ መግቢያ ተመለስ', 'Back to Portal')}
-          </button>
+          <div className="mt-6 w-full px-4 py-3 rounded-xl bg-red-50 border border-red-200 text-red-800 text-xs font-extrabold flex items-center justify-center gap-2">
+            <ShieldAlert size={16} />
+            {t('ማረጋገጫ አልተሳካም · የመታወቂያ እይታ ተዘግቷል', 'Verification Failed · Access Restricted')}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-[#0B1B3A] flex flex-col items-center justify-center p-6 sm:p-10 select-none">
+    <div
+      onContextMenu={(e) => e.preventDefault()}
+      onDragStart={(e) => e.preventDefault()}
+      onCopy={(e) => e.preventDefault()}
+      onCut={(e) => e.preventDefault()}
+      className="min-h-screen bg-[#0B1B3A] flex flex-col items-center justify-center p-6 sm:p-10 select-none verify-readonly-block"
+    >
       {TopBar}
-      <div className="mb-8 text-center flex flex-col items-center">
+      <div className="mb-6 text-center flex flex-col items-center max-w-xl">
         <div
           className="w-16 h-16 rounded-2xl border-2 border-[#C89B2B] shadow-xl flex items-center justify-center overflow-hidden mb-4"
           style={{ background: ID_CARD_BACKGROUND }}
         >
           {matchedLogo ? (
-            <img src={matchedLogo} alt="BGR Police Logo" className="w-full h-full object-contain p-1.5" />
+            <img src={matchedLogo} alt="BGR Police Logo" className="w-full h-full object-contain p-1.5 pointer-events-none" draggable={false} />
           ) : (
             <Shield size={30} className="text-[#0B1B3A]" />
           )}
         </div>
+
         {verifyState === 'expired' ? (
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-300 rounded-xl text-xs font-bold mb-3 border border-amber-400/30">
-            <ShieldAlert size={16} />
-            {t('ጊዜው ያለፈበት መታወቂያ (Expired ID)', 'Expired Official ID')}
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/20 text-amber-200 rounded-xl text-xs sm:text-sm font-black mb-3 border border-amber-400/40 shadow-sm">
+            <ShieldAlert size={18} />
+            {t('ትክክለኛ መዝገብ ሆኖ ጊዜው ያለፈበት መታወቂያ (EXPIRED)', 'Authentic Record — EXPIRED ID')}
           </div>
         ) : (
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/20 text-emerald-300 rounded-xl text-xs font-bold mb-3 border border-emerald-400/30">
-            <CheckCircle2 size={16} />
-            {t('ጸድቆ የተመዘገበ ህጋዊ መታወቂያ', 'Verified Official Registered ID')}
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/25 text-emerald-200 rounded-xl text-xs sm:text-sm font-black mb-3 border border-emerald-400/50 shadow-sm">
+            <CheckCircle2 size={18} />
+            {t('ትክክለኛነቱ የተረጋገጠ ህጋዊ መታወቂያ · AUTHENTIC & VERIFIED', 'Authentic & Verified Official Police ID')}
           </div>
         )}
-        <h1 className="text-white text-lg sm:text-xl font-extrabold">
+
+        <h1 className="text-white text-lg sm:text-xl font-black">
           {t('የቤንሻንጉል ጉሙዝ ክልል ፖሊስ ኮሚሽን', 'Benishangul-Gumuz Region Police Commission')}
         </h1>
-        <p className="text-slate-300 text-xs mt-1">
-          {t('ደህንነቱ የተጠበቀ የመታወቂያ ማረጋገጫ ፖርታል', 'Official Secure ID Verification Portal')}
+        <p className="text-slate-200 text-xs font-bold mt-1">
+          {t('የመታወቂያ የፊት ገፅ እና የትክክለኛነት ማረጋገጫ ብቻ', 'Official Front-Side ID & Authenticity Verification Only')}
         </p>
-        <div className="mt-2.5 inline-flex items-center gap-2 px-3.5 py-1 bg-gradient-to-r from-[#881337] via-[#991b1b] to-[#3b0764] text-[#FEF9C3] border border-[#F59E0B] rounded-full text-xs font-black font-mono tabular-nums shadow-md">
-          <span className="w-2 h-2 rotate-45 bg-[#FBBF24] shrink-0" />
-          {record.id_number}
-        </div>
-        {record.approved_by && (
-          <p className="text-[#E5C158] text-[11px] font-bold mt-1.5">
-            {t('ያጸደቀው አካል፡', 'Approved & Registered by:')} {record.approved_by}
-          </p>
-        )}
-      </div>
 
-      <div className="flex flex-col items-center gap-6">
-        <div className="inline-flex bg-white/10 border border-white/15 p-1 rounded-xl">
-          <button
-            type="button"
-            onClick={() => setFlipped(false)}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              !flipped ? 'bg-[#C89B2B] text-[#0B1B3A]' : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            {t('የፊት ገፅ', 'Front Side')}
-          </button>
-          <button
-            type="button"
-            onClick={() => setFlipped(true)}
-            className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              flipped ? 'bg-[#C89B2B] text-[#0B1B3A]' : 'text-slate-300 hover:text-white'
-            }`}
-          >
-            {t('የጀርባ ገፅ', 'Back Side')}
-          </button>
-        </div>
-
-        <div className="scale-[0.85] sm:scale-110 lg:scale-125 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm] my-6">
-          {!flipped ? (
-            <IDCardFront data={record} assets={assets} />
-          ) : (
-            <IDCardBack data={record} assets={assets} />
+        {/* Official Authenticity Confirmation Details */}
+        <div className="mt-4 w-full bg-white/8 border border-white/15 rounded-2xl p-4 text-left space-y-2 backdrop-blur-xs">
+          <div className="flex items-center justify-between gap-3 flex-wrap">
+            <span className="text-[11px] font-bold text-slate-300 uppercase">
+              {t('የማረጋገጫ ሁኔታ', 'Authenticity Status')}
+            </span>
+            <span className={`px-2.5 py-0.5 rounded-lg text-xs font-black ${
+              verifyState === 'expired'
+                ? 'bg-amber-400/20 text-amber-200 border border-amber-400/40'
+                : 'bg-emerald-400/20 text-emerald-200 border border-emerald-400/40'
+            }`}>
+              {verifyState === 'expired'
+                ? t('የተመዘገበ ነገር ግን ጊዜው ያለፈበት', 'Registered — Expired')
+                : t('በፋየርስቶር የተመዘገበ ትክክለኛ መታወቂያ', 'Officially Registered in Firestore')}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-2 border-t border-white/10 text-xs">
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">{t('መለያ ቁጥር', 'ID Number')}</p>
+              <p className="font-mono font-black text-[#FEF9C3]">{record.id_number}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">{t('የተሰጠበት ቀን', 'Issued Date')}</p>
+              <p className="font-bold text-white tabular-nums">{record.issued_at || 'N/A'}</p>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold text-slate-400 uppercase">{t('የሚያበቃበት ቀን', 'Expiry Date')}</p>
+              <p className={`font-bold tabular-nums ${verifyState === 'expired' ? 'text-amber-300' : 'text-emerald-300'}`}>
+                {record.expires_at || 'N/A'}
+              </p>
+            </div>
+          </div>
+          {record.approved_by && (
+            <p className="text-[#E5C158] text-[11px] font-bold pt-1 border-t border-white/10">
+              {t('ያጸደቀው አካል፡', 'Approved & Registered by:')} {record.approved_by}
+            </p>
+          )}
+          {scannedAt && (
+            <p className="text-slate-400 text-[10px] font-mono">
+              {t('የተረጋገጠበት ሰዓት፡', 'Verified at:')} {new Date(scannedAt).toLocaleString()}
+            </p>
           )}
         </div>
       </div>
 
-      <div className="mt-16 max-w-md text-center space-y-1.5">
-        <p className="text-slate-200 text-xs font-medium leading-relaxed">
+      {/* Front Side ONLY (Protected Read-Only View — Back Side & Dashboard strictly hidden) */}
+      <div className="flex flex-col items-center gap-3 my-4">
+        <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#E5C158]">
+          {t('የመታወቂያው የፊት ገፅ (Front Side Only)', 'Official ID Front Side (Read-Only)')}
+        </span>
+        <div className="relative scale-[0.88] sm:scale-110 lg:scale-125 origin-center shadow-[0_25px_50px_-12px_rgba(0,0,0,0.5)] rounded-[3.18mm] my-4">
+          <IDCardFront data={record} assets={assets} />
+          {/* Transparent shield prevents dragging/saving portrait or copying card text */}
+          <div className="absolute inset-0 z-40 bg-transparent" aria-hidden="true" />
+        </div>
+      </div>
+
+      <div className="mt-12 max-w-md text-center space-y-1.5">
+        <p className="text-slate-200 text-xs font-bold leading-relaxed">
           {t(
-            'ማሳሰቢያ፡ ይህ ገፅ ለመታወቂያ ማረጋገጫ ብቻ የሚያገለግል ነው። መረጃውን ለመለወጥ ወይም ለማጭበርበር መሞከር በህግ ያስቀጣል።',
-            'Security Notice: This verification page is read-only. Any attempt to forge or tamper with this data is punishable by law.'
+            'ጥብቅ የደህንነት ማሳሰቢያ፡ ይህ ገፅ የመታወቂያውን የፊት ገፅና ትክክለኛነት ለማረጋገጥ ብቻ የተዘጋጀ ነው። ወደ ዋናው ዳሽቦርድ መግባት፣ ማተም ወይም መረጃ መቀየር በጥብቅ የተከለከለ ነው።',
+            'Strict Security Notice: This QR verification page displays only the ID front side and authenticity confirmation. Dashboard access, editing, copying, and printing are strictly disabled.'
           )}
         </p>
       </div>
