@@ -33,7 +33,6 @@ import {
   onSnapshot,
   setDoc,
   getDoc,
-  getDocFromServer,
   limit,
   or,
   serverTimestamp
@@ -399,7 +398,8 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
           resolve(src);
           return;
         }
-        // Normalize onto exact 19.5:24.5 portrait canvas (312x392) anchored at top so edges & feathering never clip
+
+        // Normalize onto exact portrait canvas (312x392) anchored at top so head/crown never clip
         const w = 312;
         const h = 392;
         const targetRatio = w / h;
@@ -410,92 +410,162 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
           sx = Math.max(0, Math.round((srcW - sw) / 2));
         } else {
           sh = Math.round(srcW / targetRatio);
-          sy = 0; // Keep head/top intact
+          sy = 0;
         }
-        const canvas = document.createElement('canvas');
-        canvas.width = w;
-        canvas.height = h;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
+
+        const workCanvas = document.createElement('canvas');
+        workCanvas.width = w;
+        workCanvas.height = h;
+        const wctx = workCanvas.getContext('2d');
+        if (!wctx) {
           resolve(src);
           return;
         }
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
-        const imageData = ctx.getImageData(0, 0, w, h);
-        const data = imageData.data;
+        wctx.imageSmoothingEnabled = true;
+        wctx.imageSmoothingQuality = 'high';
+        wctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
 
-        // Sample upper-left & upper-right studio backdrop corners
-        let sumR = 0, sumG = 0, sumB = 0, cnt = 0;
-        let minCornerR = 255, maxCornerR = 0, minCornerG = 255, maxCornerG = 0, minCornerB = 255, maxCornerB = 0;
-        const patchW = Math.min(8, Math.floor(w / 6));
-        const patchH = Math.min(8, Math.floor(h / 6));
-        for (let y = 0; y < patchH; y++) {
-          for (let x = 0; x < patchW; x++) {
-            for (const cx of [x, w - 1 - x]) {
-              const p = (y * w + cx) * 4;
-              if (data[p + 3] > 200) {
-                const r = data[p], g = data[p + 1], b = data[p + 2];
-                sumR += r; sumG += g; sumB += b; cnt++;
-                if (r < minCornerR) minCornerR = r; if (r > maxCornerR) maxCornerR = r;
-                if (g < minCornerG) minCornerG = g; if (g > maxCornerG) maxCornerG = g;
-                if (b < minCornerB) minCornerB = b; if (b > maxCornerB) maxCornerB = b;
-              }
-            }
+        const imageData = wctx.getImageData(0, 0, w, h);
+        const data = imageData.data;
+        const total = w * h;
+
+        // 1. Precompute luminance & Sobel-style edge gradient to protect crisp hair/uniform borders
+        const lum = new Float32Array(total);
+        for (let i = 0; i < total; i++) {
+          const p = i * 4;
+          lum[i] = 0.299 * data[p] + 0.587 * data[p + 1] + 0.114 * data[p + 2];
+        }
+        const edgeMag = new Float32Array(total);
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const idx = y * w + x;
+            const gx = lum[idx + 1] - lum[idx - 1];
+            const gy = lum[idx + w] - lum[idx - w];
+            edgeMag[idx] = Math.abs(gx) + Math.abs(gy);
           }
         }
 
-        const bgR = cnt > 0 ? sumR / cnt : 255;
-        const bgG = cnt > 0 ? sumG / cnt : 255;
-        const bgB = cnt > 0 ? sumB / cnt : 255;
-        const bgSpread = Math.max(maxCornerR - minCornerR, maxCornerG - minCornerG, maxCornerB - minCornerB);
-        const bgLum = 0.299 * bgR + 0.587 * bgG + 0.114 * bgB;
-        const looksLikeSkin = (bgR - bgB > 28) && bgG < 200;
-        const hasUniformStudioBackdrop = cnt > 0 && bgSpread <= 42 && (bgLum >= 130 || (bgB > bgR + 14 && bgLum >= 95)) && !looksLikeSkin;
+        // 2. Build multi-cluster backdrop palette from upper corners & side perimeter (away from shoulders/center crown)
+        const clusters: { r: number; g: number; b: number; count: number }[] = [];
+        const addSample = (x: number, y: number) => {
+          const p = (y * w + x) * 4;
+          if (data[p + 3] < 200) return;
+          const r = data[p], g = data[p + 1], b = data[p + 2];
+          for (let c = 0; c < clusters.length; c++) {
+            const cl = clusters[c];
+            if (Math.hypot(r - cl.r, g - cl.g, b - cl.b) <= 32) {
+              const n = cl.count + 1;
+              cl.r = (cl.r * cl.count + r) / n;
+              cl.g = (cl.g * cl.count + g) / n;
+              cl.b = (cl.b * cl.count + b) / n;
+              cl.count = n;
+              return;
+            }
+          }
+          if (clusters.length < 6) {
+            clusters.push({ r, g, b, count: 1 });
+          }
+        };
 
-        const visited = new Uint8Array(w * h);
-        const queue = new Int32Array(w * h);
+        for (let y = 0; y < 8; y++) {
+          for (let x = 0; x < w; x++) {
+            // Skip center top edge where dark hair can touch top border
+            if (x > w * 0.34 && x < w * 0.66) continue;
+            addSample(x, y);
+          }
+        }
+        const sideSampleMaxY = Math.floor(h * 0.62);
+        for (let y = 8; y < sideSampleMaxY; y += 2) {
+          for (let dx = 0; dx < 7; dx++) {
+            addSample(dx, y);
+            addSample(w - 1 - dx, y);
+          }
+        }
+
+        const nonSkinClusters = clusters.filter(
+          (cl) => !(cl.r > 85 && cl.g > 48 && cl.r > cl.g && cl.r - cl.b > 32)
+        );
+        const bgPalette = (nonSkinClusters.length > 0 ? nonSkinClusters : clusters)
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 4);
+
+        const isSkinPixel = (x: number, y: number, r: number, g: number, b: number) => {
+          const fx = (x / w - 0.5) / 0.25;
+          const fy = (y / h - 0.36) / 0.26;
+          if (fx * fx + fy * fy > 1) return false;
+          const minC = Math.min(r, g, b);
+          return r > 75 && g > 42 && b > 20 && r > g && r > b && (r - minC) > 16;
+        };
+
+        const minClusterDistance = (r: number, g: number, b: number) => {
+          if (bgPalette.length === 0) return 999;
+          let best = 999;
+          for (let i = 0; i < bgPalette.length; i++) {
+            const cl = bgPalette[i];
+            const d = Math.hypot(r - cl.r, g - cl.g, b - cl.b);
+            if (d < best) best = d;
+          }
+          return best;
+        };
+
+        // 3. Edge-aware flood-fill from top, left/right borders, and lower corners
+        const visited = new Uint8Array(total);
+        const queue = new Int32Array(total);
         let head = 0;
         let tail = 0;
 
-        const isBackdropPixel = (idx: number) => {
+        const isBackdropPixel = (x: number, y: number, idx: number, parentIdx: number) => {
           const p = idx * 4;
           const a = data[p + 3];
-          if (a < 25) return true;
+          if (a < 30) return true;
           const r = data[p], g = data[p + 1], b = data[p + 2];
+          if (isSkinPixel(x, y, r, g, b)) return false;
+
+          const dist = minClusterDistance(r, g, b);
           const maxC = Math.max(r, g, b);
           const minC = Math.min(r, g, b);
-          // Bright / white studio background
-          if (r >= 208 && g >= 208 && b >= 208 && (maxC - minC) <= 44) {
-            return true;
-          }
-          // Uniform studio backdrop (light blue, cyan, light gray, cream)
-          if (hasUniformStudioBackdrop) {
-            const dist = Math.hypot(r - bgR, g - bgG, b - bgB);
-            const lum = 0.299 * r + 0.587 * g + 0.114 * b;
-            if (dist <= 40 && (lum >= 115 || bgB > bgR + 14)) {
+
+          // Near-white or bright neutral backdrop (guard white shirt at bottom center)
+          if (minC >= 186 && (maxC - minC) <= 44) {
+            if (y < h * 0.68 || x < w * 0.24 || x > w * 0.76 || dist <= 65 || edgeMag[idx] < 44) {
               return true;
             }
           }
+
+          // Strong color match to studio/wall perimeter clusters
+          if (dist <= 44) {
+            return true;
+          }
+
+          // Smooth gradient backdrop continuity without crossing sharp hair/uniform edges
+          if (parentIdx >= 0 && dist <= 78 && edgeMag[idx] < 46) {
+            const pp = parentIdx * 4;
+            const localDiff = Math.hypot(r - data[pp], g - data[pp + 1], b - data[pp + 2]);
+            if (localDiff <= 22) return true;
+          }
+
           return false;
         };
 
-        const enqueueIfBackdrop = (x: number, y: number) => {
+        const enqueueIfBackdrop = (x: number, y: number, parentIdx: number) => {
           const idx = y * w + x;
-          if (!visited[idx] && isBackdropPixel(idx)) {
+          if (!visited[idx] && isBackdropPixel(x, y, idx, parentIdx)) {
             visited[idx] = 1;
             queue[tail++] = idx;
           }
         };
 
         for (let x = 0; x < w; x++) {
-          enqueueIfBackdrop(x, 0);
+          enqueueIfBackdrop(x, 0, -1);
         }
-        const sideLimitY = Math.round(h * 0.8);
+        const sideLimitY = Math.round(h * 0.90);
         for (let y = 1; y < sideLimitY; y++) {
-          enqueueIfBackdrop(0, y);
-          enqueueIfBackdrop(w - 1, y);
+          enqueueIfBackdrop(0, y, -1);
+          enqueueIfBackdrop(w - 1, y, -1);
+        }
+        for (let x = 0; x < Math.round(w * 0.14); x++) {
+          enqueueIfBackdrop(x, h - 1, -1);
+          enqueueIfBackdrop(w - 1 - x, h - 1, -1);
         }
 
         while (head < tail) {
@@ -504,13 +574,14 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
           data[p + 3] = 0;
           const x = idx % w;
           const y = (idx - x) / w;
-          if (x > 0) enqueueIfBackdrop(x - 1, y);
-          if (x < w - 1) enqueueIfBackdrop(x + 1, y);
-          if (y > 0) enqueueIfBackdrop(x, y - 1);
-          if (y < h - 1) enqueueIfBackdrop(x, y + 1);
+          if (x > 0) enqueueIfBackdrop(x - 1, y, idx);
+          if (x < w - 1) enqueueIfBackdrop(x + 1, y, idx);
+          if (y > 0) enqueueIfBackdrop(x, y - 1, idx);
+          if (y < h - 1) enqueueIfBackdrop(x, y + 1, idx);
         }
 
-        // Soften anti-aliased fringe adjacent to cleared studio background
+        // 4. Feather anti-aliased fringe & decontaminate studio halo toward soft white
+        const edgeBand1 = new Uint8Array(total);
         for (let y = 1; y < h - 1; y++) {
           for (let x = 1; x < w - 1; x++) {
             const idx = y * w + x;
@@ -521,39 +592,98 @@ const stripPhotoBackgroundAndBlend = (src: string): Promise<string> => {
               (visited[idx - w] ? 1 : 0) +
               (visited[idx + w] ? 1 : 0);
             if (clearedNeighbors > 0) {
+              edgeBand1[idx] = 1;
               const p = idx * 4;
-              const factor = clearedNeighbors >= 2 ? 0.2 : 0.45;
+              const factor = clearedNeighbors >= 2 ? 0.22 : 0.48;
               data[p + 3] = Math.round(data[p + 3] * factor);
+              // Decontaminate blue/gray background tint toward white
+              data[p] = Math.min(255, Math.round(data[p] * 0.65 + 255 * 0.35));
+              data[p + 1] = Math.min(255, Math.round(data[p + 1] * 0.65 + 255 * 0.35));
+              data[p + 2] = Math.min(255, Math.round(data[p + 2] * 0.65 + 255 * 0.35));
+            }
+          }
+        }
+        for (let y = 1; y < h - 1; y++) {
+          for (let x = 1; x < w - 1; x++) {
+            const idx = y * w + x;
+            if (visited[idx] || edgeBand1[idx]) continue;
+            if (edgeBand1[idx - 1] || edgeBand1[idx + 1] || edgeBand1[idx - w] || edgeBand1[idx + w]) {
+              const p = idx * 4;
+              data[p + 3] = Math.round(data[p + 3] * 0.8);
             }
           }
         }
 
-        // Organic outer edge & bottom feathering so NO sharp rectangle border ever appears
+        // 5. Smooth organic bust/oval dissolve so ZERO rectangular corners or borders can ever remain
         const smooth = (t: number) => {
           const c = Math.max(0, Math.min(1, t));
           return c * c * (3 - 2 * c);
         };
         for (let y = 0; y < h; y++) {
           const ny = y / h;
+          const rx = ny < 0.48 ? 0.415 : 0.415 + (ny - 0.48) * 0.21;
+          const ry = 0.475;
+          const bottomFade = ny > 0.80 ? smooth((0.99 - ny) / 0.19) : 1;
           const topFade = ny < 0.04 ? smooth(ny / 0.04) : 1;
-          const bottomFade = ny > 0.85 ? smooth((1 - ny) / 0.15) : 1;
-          const yFade = topFade * bottomFade;
           for (let x = 0; x < w; x++) {
             const idx = y * w + x;
             const p = idx * 4;
             if (data[p + 3] === 0) continue;
             const nx = x / w;
-            const leftFade = nx < 0.06 ? smooth(nx / 0.06) : 1;
-            const rightFade = nx > 0.94 ? smooth((1 - nx) / 0.06) : 1;
-            const edgeFade = yFade * leftFade * rightFade;
-            if (edgeFade < 1) {
-              data[p + 3] = Math.round(data[p + 3] * edgeFade);
+            const er = Math.hypot((nx - 0.5) / rx, (ny - 0.44) / ry);
+            const ovalFade = er <= 0.78 ? 1 : smooth((1.0 - er) / 0.22);
+            const mask = ovalFade * bottomFade * topFade;
+            if (mask < 1) {
+              data[p + 3] = Math.round(data[p + 3] * mask);
             }
           }
         }
 
-        ctx.putImageData(imageData, 0, 0);
-        const out = canvas.toDataURL('image/png');
+        wctx.putImageData(imageData, 0, 0);
+
+        // 6. Composite onto fresh padded canvas with a soft pure-white silhouette halo around ONLY the person
+        const haloCanvas = document.createElement('canvas');
+        haloCanvas.width = w;
+        haloCanvas.height = h;
+        const hctx = haloCanvas.getContext('2d');
+
+        const finalCanvas = document.createElement('canvas');
+        finalCanvas.width = w;
+        finalCanvas.height = h;
+        const fctx = finalCanvas.getContext('2d');
+        if (!fctx || !hctx) {
+          resolve(workCanvas.toDataURL('image/png'));
+          return;
+        }
+
+        hctx.drawImage(workCanvas, 0, 0);
+        hctx.globalCompositeOperation = 'source-in';
+        hctx.fillStyle = '#ffffff';
+        hctx.fillRect(0, 0, w, h);
+
+        const padX = 12;
+        const padTop = 10;
+        const drawW = w - padX * 2;
+        const drawH = h - padTop - 4;
+
+        fctx.imageSmoothingEnabled = true;
+        fctx.imageSmoothingQuality = 'high';
+
+        // Two soft white aura passes hugging the person's cutout shape, fading cleanly into the card
+        fctx.save();
+        fctx.shadowColor = 'rgba(255, 255, 255, 0.98)';
+        fctx.shadowBlur = 18;
+        fctx.globalAlpha = 0.85;
+        fctx.drawImage(haloCanvas, padX, padTop, drawW, drawH);
+        fctx.shadowBlur = 9;
+        fctx.globalAlpha = 0.7;
+        fctx.drawImage(haloCanvas, padX, padTop, drawW, drawH);
+        fctx.restore();
+
+        // Crisp person cutout on top
+        fctx.drawImage(workCanvas, padX, padTop, drawW, drawH);
+
+        const out = finalCanvas.toDataURL('image/png');
         matchedPhotoCache.set(src, out);
         resolve(out);
       } catch {
@@ -882,25 +1012,20 @@ const IDCardFront = React.forwardRef<HTMLDivElement, { data: Partial<IDRecord>, 
           </div>
         </div>
 
-        {/* Right Column: Borderless Portrait Blended Softly Toward White + Fayda FIN Tag */}
+        {/* Right Column: Borderless Cutout Portrait Blended Softly With White Halo + Fayda FIN Tag */}
         <div className="w-[21mm] flex flex-col items-center justify-between py-0.5">
-          <div
-            className="w-[20mm] h-[23mm] relative flex items-end justify-center"
-            style={{
-              background: 'radial-gradient(ellipse 68% 72% at 50% 48%, rgba(255, 255, 255, 0.88) 0%, rgba(255, 251, 235, 0.45) 52%, rgba(255, 255, 255, 0) 76%)'
-            }}
-          >
+          <div className="w-[20.5mm] h-[24mm] relative flex items-end justify-center overflow-visible">
             {matchedPhoto ? (
               <img 
                 src={matchedPhoto} 
-                className="w-[19mm] h-[22mm] object-contain relative z-10" 
+                className="w-[20.5mm] h-[24mm] object-contain relative z-10" 
                 alt="Member" 
                 crossOrigin="anonymous"
               />
             ) : (
               <div
                 className="w-[15mm] h-[15mm] rounded-full flex items-center justify-center mb-2"
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.65)', color: '#94a3b8' }}
+                style={{ backgroundColor: 'rgba(255, 255, 255, 0.72)', color: '#94a3b8' }}
               >
                 <User size={24} />
               </div>
@@ -1210,6 +1335,7 @@ export function App() {
   const [user, setUser] = useState<any | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const isLoggingInRef = useRef(false);
   const [view, setViewState] = useState<AppView>('dashboard');
   const [viewHistory, setViewHistory] = useState<AppView[]>([]);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -1380,52 +1506,105 @@ export function App() {
   useEffect(() => {
     setIsMounted(true);
 
-    // Non-blocking boot connection check
-    raceWithTimeout(getDocFromServer(doc(db, 'test', 'connection')), 2500, null as any).catch(() => {});
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      // Do not race or overwrite UI state while handleLogin is actively authenticating
+      if (isLoggingInRef.current) {
+        return;
+      }
+
       const savedSession = localStorage.getItem('police_id_session');
       let sessionData: any = null;
       if (savedSession) {
         try {
           sessionData = JSON.parse(savedSession);
-          if (!firebaseUser || (firebaseUser.uid === sessionData.firebaseUid || firebaseUser.isAnonymous)) {
-            setUser({
-              id: sessionData.id,
-              username: sessionData.username || sessionData.email,
-              email: sessionData.email,
-              role: sessionData.role
-            });
-            setToken('firestore-session');
-            if (!firebaseUser) {
-              try {
-                const cred = await signInAnonymously(auth);
-                const profilePayload: Record<string, any> = {
-                  email: (sessionData.email || sessionData.username || '').toLowerCase(),
-                  username: sessionData.username || sessionData.email || '',
-                  role: sessionData.role || 'Viewer',
-                  active: true,
-                  last_login: new Date().toISOString()
-                };
-                if (sessionData.id && sessionData.id !== 'superadmin-fallback') {
-                  profilePayload.user_doc_id = sessionData.id;
-                }
-                await setDoc(doc(db, 'profiles', cred.user.uid), profilePayload, { merge: true });
-              } catch (reauthErr) {
-                console.warn("Session re-sync notice:", reauthErr);
-              }
-              setIsAuthReady(true);
-              return;
-            }
-          }
         } catch {
           localStorage.removeItem('police_id_session');
         }
       }
 
+      // Restore cached session cleanly on page reload before exposing dashboard listeners
+      if (sessionData && !firebaseUser) {
+        try {
+          const cred = await signInAnonymously(auth);
+          const profilePayload: Record<string, any> = {
+            email: (sessionData.email || sessionData.username || '').toLowerCase(),
+            username: sessionData.username || sessionData.email || '',
+            role: sessionData.role || 'Viewer',
+            active: true,
+            last_login: new Date().toISOString()
+          };
+          if (sessionData.id && sessionData.id !== 'superadmin-fallback') {
+            profilePayload.user_doc_id = sessionData.id;
+          }
+          await setDoc(doc(db, 'profiles', cred.user.uid), profilePayload, { merge: true });
+          const syncedSession = { ...sessionData, firebaseUid: cred.user.uid };
+          localStorage.setItem('police_id_session', JSON.stringify(syncedSession));
+          setUser({
+            id: syncedSession.id,
+            firebaseUid: cred.user.uid,
+            username: syncedSession.username || syncedSession.email,
+            email: syncedSession.email,
+            role: syncedSession.role
+          });
+          setToken('firestore-session');
+        } catch (reauthErr) {
+          console.warn("Session re-sync notice:", reauthErr);
+          localStorage.removeItem('police_id_session');
+          setUser(null);
+          setToken(null);
+        }
+        setIsAuthReady(true);
+        return;
+      }
+
       if (firebaseUser) {
         try {
-          // Verify restored account is still active in Firestore users collection
+          // Fast path: restored session already matches this Firebase UID
+          if (sessionData && firebaseUser.uid === sessionData.firebaseUid) {
+            setUser({
+              id: sessionData.id,
+              firebaseUid: firebaseUser.uid,
+              username: sessionData.username || sessionData.email,
+              email: sessionData.email,
+              role: sessionData.role
+            });
+            setToken(firebaseUser.isAnonymous ? 'firestore-session' : 'firebase-token');
+            setIsAuthReady(true);
+
+            // Background verification that user account wasn't deactivated
+            if (sessionData.id && sessionData.id !== 'superadmin-fallback') {
+              getDoc(doc(db, 'users', sessionData.id))
+                .then(async (userDocSnap) => {
+                  if (userDocSnap.exists() && userDocSnap.data().active === false) {
+                    localStorage.removeItem('police_id_session');
+                    await signOut(auth);
+                    setUser(null);
+                    setToken(null);
+                  }
+                })
+                .catch(() => {});
+            }
+            return;
+          }
+
+          let profileDoc = null;
+          try {
+            profileDoc = await getDoc(doc(db, 'profiles', firebaseUser.uid));
+          } catch {}
+
+          const emailLower = firebaseUser.email?.toLowerCase() || sessionData?.email?.toLowerCase() || '';
+          const isRealSuperAdmin =
+            !firebaseUser.isAnonymous &&
+            (emailLower === 'policeregion551@gmail.com' || emailLower === 'yirsawbiniyam@gmail.com');
+
+          // Never auto-login bare anonymous sessions (e.g. QR verification) as unauthorized 'Viewer'
+          if (firebaseUser.isAnonymous && !sessionData && !profileDoc?.exists()) {
+            setUser(null);
+            setToken(null);
+            setIsAuthReady(true);
+            return;
+          }
+
           if (sessionData?.id && sessionData.id !== 'superadmin-fallback') {
             try {
               const userDocSnap = await getDoc(doc(db, 'users', sessionData.id));
@@ -1440,18 +1619,6 @@ export function App() {
             } catch {}
           }
 
-          let profileDoc = null;
-          try {
-            profileDoc = await getDoc(doc(db, 'profiles', firebaseUser.uid));
-          } catch (e) {
-            console.warn("Profile fetch restricted or failed:", e);
-          }
-
-          const emailLower = firebaseUser.email?.toLowerCase() || sessionData?.email?.toLowerCase() || '';
-          const isRealSuperAdmin =
-            !firebaseUser.isAnonymous &&
-            (emailLower === 'policeregion551@gmail.com' || emailLower === 'yirsawbiniyam@gmail.com');
-
           let role = isRealSuperAdmin ? 'Administrator' : (sessionData?.role || 'Viewer');
           let email = firebaseUser.email || sessionData?.email || '';
           let username = sessionData?.username || email || 'User';
@@ -1459,8 +1626,8 @@ export function App() {
             sessionData?.id && sessionData.id !== 'superadmin-fallback' ? sessionData.id : undefined;
 
           if (!profileDoc?.exists()) {
-            try {
-              if (email) {
+            if (email && !firebaseUser.isAnonymous) {
+              try {
                 const q = query(collection(db, 'users'), where('email', '==', email.toLowerCase()), limit(1));
                 const userSnapshot = await getDocs(q);
                 if (!userSnapshot.empty) {
@@ -1479,9 +1646,9 @@ export function App() {
                   username = userData.username || email;
                   resolvedUserDocId = matchedDoc.id;
                 }
+              } catch (e) {
+                console.warn("Users lookup failed", e);
               }
-            } catch (e) {
-              console.warn("Users lookup failed", e);
             }
 
             if (isRealSuperAdmin || resolvedUserDocId) {
@@ -1500,9 +1667,22 @@ export function App() {
               } catch (e) {
                 console.error("Auth state profile creation failed:", e);
               }
+            } else {
+              setUser(null);
+              setToken(null);
+              setIsAuthReady(true);
+              return;
             }
           } else {
             const profileData = profileDoc.data();
+            if (profileData.active === false) {
+              localStorage.removeItem('police_id_session');
+              await signOut(auth);
+              setUser(null);
+              setToken(null);
+              setIsAuthReady(true);
+              return;
+            }
             role = profileData.role || role;
             email = profileData.email || email;
             username = profileData.username || sessionData?.username || email;
@@ -1515,11 +1695,13 @@ export function App() {
             email,
             role: role as UserRole
           });
+          setToken(firebaseUser.isAnonymous ? 'firestore-session' : 'firebase-token');
         } catch (err) {
           console.error("Auth sync error:", err);
+          setUser(null);
+          setToken(null);
         }
-        setToken('firebase-token');
-      } else if (!sessionData) {
+      } else {
         setUser(null);
         setToken(null);
       }
@@ -1530,11 +1712,12 @@ export function App() {
 
   // Fetch & subscribe to system assets via individual document listeners (avoids unauthenticated collection list queries)
   useEffect(() => {
-    const assetKeys: (keyof Assets)[] = user
+    const canReadProtected = Boolean(user && token && auth.currentUser);
+    const assetKeys: (keyof Assets)[] = canReadProtected
       ? ['police_logo', 'bgr_flag', 'eth_flag', 'commissioner_signature']
       : ['police_logo', 'bgr_flag', 'eth_flag'];
 
-    fetchAssets(Boolean(user));
+    fetchAssets(canReadProtected);
 
     const unsubs = assetKeys.map((key) => {
       try {
@@ -1574,7 +1757,7 @@ export function App() {
         } catch {}
       });
     };
-  }, [user?.id, user?.role]);
+  }, [user?.id, user?.role, token]);
 
   const buildRecordsQuery = useCallback(() => {
     const idsRef = collection(db, 'ids');
@@ -1593,7 +1776,7 @@ export function App() {
 
   // Real-time IndexedDB-cached snapshot listener: zero-lag search & offline-first ID workflow
   useEffect(() => {
-    if (!user) {
+    if (!user || !token || !auth.currentUser) {
       setAllRecords([]);
       return;
     }
@@ -1611,7 +1794,7 @@ export function App() {
       }
     );
     return () => unsub();
-  }, [user, buildRecordsQuery]);
+  }, [user, token, buildRecordsQuery]);
 
   // Instantaneous 0ms client-side search & status filter
   const records = useMemo(() => {
@@ -2049,6 +2232,7 @@ export function App() {
       return;
     }
 
+    isLoggingInRef.current = true;
     setLoading(true);
     try {
       // Ensure Firebase Auth session exists before reading protected users collection
@@ -2056,32 +2240,29 @@ export function App() {
         await signInAnonymously(auth);
       }
 
-      // 1. Try Firestore-backed login by email OR username
+      // 1. Parallel Firestore-backed lookup by email OR username (1 network round-trip)
       let userData: any = null;
       let userDocId: string | null = null;
 
       const emailQ = query(collection(db, 'users'), where('email', '==', identifier), limit(1));
-      const emailSnap = await getDocs(emailQ);
+      const userLowerQ = query(collection(db, 'users'), where('username_lower', '==', identifier), limit(1));
+      const [emailSnap, userLowerSnap] = await Promise.all([getDocs(emailQ), getDocs(userLowerQ)]);
 
       if (!emailSnap.empty) {
         const userDoc = emailSnap.docs[0];
         userData = userDoc.data();
         userDocId = userDoc.id;
-      } else {
-        const userLowerQ = query(collection(db, 'users'), where('username_lower', '==', identifier), limit(1));
-        const userLowerSnap = await getDocs(userLowerQ);
-        if (!userLowerSnap.empty) {
-          const userDoc = userLowerSnap.docs[0];
+      } else if (!userLowerSnap.empty) {
+        const userDoc = userLowerSnap.docs[0];
+        userData = userDoc.data();
+        userDocId = userDoc.id;
+      } else if (rawIdentifier !== identifier) {
+        const userExactQ = query(collection(db, 'users'), where('username', '==', rawIdentifier), limit(1));
+        const userExactSnap = await getDocs(userExactQ);
+        if (!userExactSnap.empty) {
+          const userDoc = userExactSnap.docs[0];
           userData = userDoc.data();
           userDocId = userDoc.id;
-        } else {
-          const userExactQ = query(collection(db, 'users'), where('username', '==', rawIdentifier), limit(1));
-          const userExactSnap = await getDocs(userExactQ);
-          if (!userExactSnap.empty) {
-            const userDoc = userExactSnap.docs[0];
-            userData = userDoc.data();
-            userDocId = userDoc.id;
-          }
         }
       }
 
@@ -2091,7 +2272,6 @@ export function App() {
             "መለያዎ ታግዷል። እባክዎ አስተዳዳሪውን ያነጋግሩ።",
             "Your account has been deactivated. Please contact the Administrator."
           ));
-          setLoading(false);
           return;
         }
 
@@ -2101,8 +2281,9 @@ export function App() {
           try {
             // Auto-migrate legacy plaintext password to PBKDF2-SHA-256 hash on login
             if (!String(userData.password || '').startsWith('pbkdf2_sha256$')) {
-              const upgradedHash = await hashPassword(credentials.password);
-              updateDoc(doc(db, 'users', userDocId), { password: upgradedHash }).catch(() => {});
+              hashPassword(credentials.password)
+                .then((upgradedHash) => updateDoc(doc(db, 'users', userDocId!), { password: upgradedHash }))
+                .catch(() => {});
             }
 
             const currentAuth = auth.currentUser || (await signInAnonymously(auth)).user;
@@ -2118,7 +2299,7 @@ export function App() {
               active: userData.active !== false,
               user_doc_id: userDocId,
               last_login: new Date().toISOString()
-            });
+            }, { merge: true });
 
             const sessionUser = {
               id: userDocId,
@@ -2128,10 +2309,10 @@ export function App() {
               role: userData.role || 'Viewer'
             };
 
+            localStorage.setItem('police_id_session', JSON.stringify(sessionUser));
             setUser(sessionUser as any);
             setToken('firestore-session');
-            localStorage.setItem('police_id_session', JSON.stringify(sessionUser));
-            setLoading(false);
+            setIsAuthReady(true);
             return;
           } catch (anonErr: any) {
             console.error("Session profile creation failed:", anonErr);
@@ -2140,7 +2321,6 @@ export function App() {
               errMsg += " Network error. This usually means the domain is not authorized in Firebase Console.";
             }
             alert(errMsg);
-            setLoading(false);
             return;
           }
         } else {
@@ -2149,18 +2329,54 @@ export function App() {
             "የገባው ዩሰርኔም/ኢሜይል ወይም የይለፍ ቃል ትክክል አይደለም።",
             "Invalid username/email or password."
           ));
-          setLoading(false);
           return;
         }
       }
 
-      // 2. Fallback to Firebase Auth Email/Password (e.g. Super Admin registered via Firebase Auth)
+      // 2. Fallback to Firebase Auth Email/Password directly (no signOut gap/bounce)
       if (identifier.includes('@')) {
-        if (auth.currentUser?.isAnonymous) {
-          await signOut(auth);
-        }
-        await signInWithEmailAndPassword(auth, identifier, credentials.password);
+        const cred = await signInWithEmailAndPassword(auth, identifier, credentials.password);
         clearFailures();
+
+        const fbUser = cred.user;
+        const emailLower = (fbUser.email || identifier).toLowerCase();
+        const isSuperAdminAccount =
+          emailLower === 'policeregion551@gmail.com' || emailLower === 'yirsawbiniyam@gmail.com';
+        let role: UserRole = isSuperAdminAccount ? 'Administrator' : 'Viewer';
+        let username = fbUser.displayName || emailLower;
+        let docId = isSuperAdminAccount ? 'superadmin-fallback' : fbUser.uid;
+
+        if (isSuperAdminAccount) {
+          await setDoc(doc(db, 'profiles', fbUser.uid), {
+            email: emailLower,
+            username,
+            role,
+            active: true,
+            last_login: new Date().toISOString()
+          }, { merge: true });
+        } else {
+          const existingSnap = await getDoc(doc(db, 'profiles', fbUser.uid)).catch(() => null);
+          if (!existingSnap?.exists() || existingSnap.data()?.active === false) {
+            throw new Error(t("የተጠቃሚ መለያ በሲስተሙ ውስጥ አልተገኘም።", "Staff profile not found or deactivated."));
+          }
+          const existingData = existingSnap.data()!;
+          role = (existingData.role as UserRole) || 'Viewer';
+          username = existingData.username || username;
+          docId = existingData.user_doc_id || fbUser.uid;
+        }
+
+        const sessionUser = {
+          id: docId,
+          firebaseUid: fbUser.uid,
+          username,
+          email: emailLower,
+          role
+        };
+
+        localStorage.setItem('police_id_session', JSON.stringify(sessionUser));
+        setUser(sessionUser as any);
+        setToken('firebase-token');
+        setIsAuthReady(true);
       } else {
         recordFailure();
         alert(t(
@@ -2183,6 +2399,7 @@ export function App() {
       }
       alert(t('መግባት አልተቻለም: ', 'Login error: ') + msg);
     } finally {
+      isLoggingInRef.current = false;
       setLoading(false);
     }
   };
